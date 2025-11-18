@@ -38,9 +38,9 @@ def run(playwright):
       # Fill campos
       page.get_by_role("textbox", name="Nome da negociação *").fill(nome)
       page.get_by_text("Salvar e criar outra", exact=True).click()
-      
+
 
     navegador.close()
-    
+
 with sync_playwright() as playwright:
   run(playwright)
