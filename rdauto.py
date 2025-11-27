@@ -33,6 +33,7 @@ async def run(playwright):
     for negociacao in listanegociacoes:
         await page.wait_for_timeout(3000)
 
+<<<<<<< HEAD
         nome = negociacao["Nomes"]
 
         # preencher campos
@@ -49,3 +50,16 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+=======
+      nome = negociacao['Nomes']
+      
+      # Fill campos
+      page.get_by_role("textbox", name="Nome da negociação *").fill(nome)
+      page.get_by_text("Salvar e criar outra", exact=True).click()
+
+
+    navegador.close()
+
+with sync_playwright() as playwright:
+  run(playwright)
+>>>>>>> 17996c4cb02946e7370d725391c53e9c6a13a649
