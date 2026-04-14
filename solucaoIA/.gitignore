@@ -1,0 +1,8 @@
+.env
+venv/
+downloads/
+__pycache__/
+credenciais.json
+historico_downloads.json
+pendentes_ia.json
+tipos_de_exames.txt

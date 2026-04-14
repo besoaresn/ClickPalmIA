@@ -1,0 +1,6 @@
+browser-use
+playwright
+pandas
+gspread
+requests
+python-dotenv
