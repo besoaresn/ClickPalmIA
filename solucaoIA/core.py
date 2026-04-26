@@ -17,7 +17,7 @@ from data_manager import (
 from config import (
     USER_FIELD_SELECTOR, PASS_FIELD_SELECTOR, LOGIN_BUTTON_SELECTOR, 
     SITE_URL, USER, PASS, DOWNLOAD_DIR, SEARCH_BAR_SELECTOR,
-    HEADLESS_MODE, IS_DOCKER, AGENT_ONLY_MODE
+    HEADLESS_MODE, IS_DOCKER, AGENT_ONLY_MODE, CREDENTIALS_FILE
 )
 
 def check_exam_date(date_str):
@@ -94,7 +94,7 @@ def is_html_report(url: str) -> bool:
 
 def read_patients_from_gsheets(sheet_url: str) -> dict:
     try:
-        gc = gspread.service_account(filename="credenciais.json")
+        gc = gspread.service_account(filename=CREDENTIALS_FILE)
         planilha = gc.open_by_url(sheet_url).sheet1
         df = pd.DataFrame(planilha.get_all_records())
 
@@ -127,7 +127,7 @@ def read_patients_from_gsheets(sheet_url: str) -> dict:
 
 def update_sheet_status(sheet_url, row_index, status_value):
     try:
-        gc = gspread.service_account(filename="credenciais.json")
+        gc = gspread.service_account(filename=CREDENTIALS_FILE)
         sh = gc.open_by_url(sheet_url).sheet1
         headers = sh.row_values(1)
         if "STATUS" in headers:

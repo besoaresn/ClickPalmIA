@@ -1,4 +1,7 @@
 import os
+# Desabilitar telemetria do Browser Use (não usar dados para treinamento)
+os.environ["ANONYMIZED_TELEMETRY"] = "false"
+os.environ["BROWSER_USE_ANONYMOUS_TELEMETRY"] = "false"
 import asyncio
 import glob
 import shutil
@@ -6,7 +9,8 @@ import re
 import tempfile
 import unicodedata
 from datetime import datetime
-from browser_use import Agent, Browser, ChatBrowserUse
+from browser_use import Agent, Browser
+from browser_use.llm.google import ChatGoogle
 
 from config import USER, PASS, SITE_URL, DOWNLOAD_DIR
 from api_client import upload_to_api
@@ -71,7 +75,21 @@ async def run_ai_batch_rescue() -> dict:
             pacientes_agrupados[nome] = []
         pacientes_agrupados[nome].append(p)
 
-    llm = ChatBrowserUse(model='bu-latest', api_key=os.getenv("BROWSER_USE_API_KEY", ""))
+    # Aceita os dois nomes de variável para evitar quebra por documentação antiga.
+    api_key = os.getenv("GEMINI_API_KEY", "")
+    if not api_key:
+        print("    [ERRO] Configure GEMINI_API_KEY no ambiente para usar o resgate IA.")
+        return stats_ia
+
+    try:
+        llm = ChatGoogle(
+            model="gemini-2.5-pro",
+            api_key=api_key,
+            temperature=0.7
+        )
+    except Exception as e:
+        print(f"    [ERRO] Falha ao inicializar LLM: {e}")
+        return stats_ia
 
     for nome_paciente, exames in pacientes_agrupados.items():
         print(f"\n    [IA RESGATE] 🤖 Iniciando resgate LOTE ÚNICO para {nome_paciente} ({len(exames)} exames)")
@@ -117,13 +135,14 @@ async def run_ai_batch_rescue() -> dict:
             estado_escuta = {"ativo": True}
             watchdog_task = asyncio.create_task(watchdog_pastas(estado_escuta, staging_dir))
             
+            # ChatGoogle é o adaptador nativo compatível com o Agent do browser-use.
             agent = Agent(task=task_prompt, llm=llm, browser=browser)
             history = await agent.run()
             final_result = history.final_result() or ""
-            
+
             estado_escuta["ativo"] = False
             arquivos_capturados = await watchdog_task
-            
+
             match_id = re.search(r'ID_EXTRAIDO:\s*(\d+)', final_result, re.IGNORECASE)
             ID_PACIENTE = match_id.group(1).zfill(16) if match_id else "0000000000000000"
 
@@ -175,5 +194,5 @@ async def run_ai_batch_rescue() -> dict:
             if browser:
                 try: await browser.close()
                 except: pass
-                
+
     return stats_ia

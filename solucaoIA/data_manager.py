@@ -1,9 +1,7 @@
 import os
 import json
 import unicodedata
-from config import HISTORY_FILE
-
-PENDENTES_IA_FILE = "pendentes_ia.json"
+from config import HISTORY_FILE, PENDENTES_IA_FILE
 
 def remove_accents(input_str):
     if not input_str: return ""

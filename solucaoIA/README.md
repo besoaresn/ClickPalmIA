@@ -70,8 +70,10 @@ Você precisará configurar os seguintes arquivos na raiz do projeto:
    CLICKPALM_CPF=seu_cpf
    CLICKPALM_PASS=sua_senha
    
-   # Chave da IA (Browser Use / LLM)
-   BROWSER_USE_API_KEY=sua_chave_aqui
+   # Chave da IA (LLM)
+   GEMINI_API_KEY=sua_chave_aqui
+   # Alternativa legada também aceita pelo código:
+   
    
    # Configuração de Execução
    HEADLESS=true

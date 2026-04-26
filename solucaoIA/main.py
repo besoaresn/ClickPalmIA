@@ -76,7 +76,7 @@ def run_automation():
         print("[SISTEMA] Iniciando Agente de IA para limpar a fila de erros...")
     
     res_ia = asyncio.run(run_ai_batch_rescue())
-    
+
     if res_ia:
         metricas["sucesso_download_agente_ia"] += res_ia.get("sucesso_ia", 0)
         metricas["falha_absoluta_exames"] += res_ia.get("falha_ia", 0)
