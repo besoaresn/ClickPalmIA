@@ -13,6 +13,7 @@ HEADLESS_MODE = os.getenv('HEADLESS', str(IS_DOCKER)).lower() == 'true'
 SITE_URL = "https://portalpacientesexames.hmv.org.br/portal/WebLogin.aspx?force_all_browsers=truebr/"
 USER = os.getenv("PORTAL_USER", "")
 PASS = os.getenv("PORTAL_PASS", "")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 
 # Seletores Essenciais
 USER_FIELD_SELECTOR = "loginUsernameInput"

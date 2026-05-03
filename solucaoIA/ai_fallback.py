@@ -11,14 +11,13 @@ import unicodedata
 from datetime import datetime
 from browser_use import Agent, Browser
 from browser_use.llm.google import ChatGoogle
-
-from config import USER, PASS, SITE_URL, DOWNLOAD_DIR
+from config import USER, PASS, SITE_URL, DOWNLOAD_DIR, GEMINI_MODEL
 from api_client import upload_to_api
 from data_manager import write_download_history, read_pendentes_ia, remove_pendente_ia
 
-try: 
+try:
     from browser_use import BrowserConfig
-except ImportError: 
+except ImportError:
     BrowserConfig = None
 
 def remove_accents(input_str):
@@ -83,7 +82,7 @@ async def run_ai_batch_rescue() -> dict:
 
     try:
         llm = ChatGoogle(
-            model="gemini-2.5-pro",
+            model=GEMINI_MODEL,
             api_key=api_key,
             temperature=0.7
         )
@@ -120,7 +119,7 @@ async def run_ai_batch_rescue() -> dict:
             - 4º PASSO: Aguarde 4 segundos. 
               -> Se a tela mostrar "não está disponível para exibição", o laudo não existe no hospital. Ignore o download, anote o nome do exame e FECHE a aba (se alguma abriu).
               -> Se a página NÃO MUDOU, o arquivo baixou invisível. Prossiga para o próximo exame.
-              -> Se a página MUDOU para um relatório de texto (HTML), use a sua ação nativa de gerar PDF (save_as_pdf), aguarde e feche a aba.
+              -> Se a página MUDOU para um relatório de texto (HTML), use a sua ação nativa de gerar PDF (save_as_pdf), aguarde e volte para o campo de pesquisa.
             - 5º PASSO: Repita para o PRÓXIMO exame da lista.
             
             REGRAS DE PARADA:
@@ -136,7 +135,7 @@ async def run_ai_batch_rescue() -> dict:
             watchdog_task = asyncio.create_task(watchdog_pastas(estado_escuta, staging_dir))
             
             # ChatGoogle é o adaptador nativo compatível com o Agent do browser-use.
-            agent = Agent(task=task_prompt, llm=llm, browser=browser)
+            agent = Agent(task=task_prompt, llm=llm, browser=browser,use_vision=True, vision_detail_level="low", )
             history = await agent.run()
             final_result = history.final_result() or ""
 
@@ -171,7 +170,7 @@ async def run_ai_batch_rescue() -> dict:
                     except Exception as me:
                         print(f"    [IA] Erro ao mover: {me}")
 
-                # Limpa a fila de pendentes para não ficar num loop infinito
+                # Limpa a fila de pendentes para não ficar num loop infinito 
                 for e in exames:
                     remove_pendente_ia(e["exam_history_id"])
                     write_download_history(e["exam_history_id"])
