@@ -28,7 +28,20 @@ def check_exam_date(date_str):
         return False 
 
 def is_relevant_exam(exam_text: str) -> bool:
-    target_keywords = ["MAMA", "MAMO", "MAMMO", "MMG", "BREAST", "AXILA", "IMPLANT", "NODULO", "ECOGRAFIA", "ULTRASSONOGRAFIA"]
+    target_keywords = [
+        # Mamografia
+        "MAMA", "MAMO", "MAMMO", "MMG", "MAMOGRAFIA", "MAMMOGRAPHY",
+        # Ultrassom/Ecografia
+        "ECOGRAFIA", "ULTRASSONOGRAFIA", "ULTRASSOM", "ULTRASOUND", "ECHO",
+        # Imagem torácica
+        "BREAST", "AXILA", "AXILAR",
+        # Achados/Lesões
+        "IMPLANT", "IMPLANTE", "NODULO", "NODULE", "LESAO", "CISTO", "CICATRIZ",
+        # RM de Mama
+        "RESSONANCIA", "MRI", "MAGNETIC",
+        # Genéricos (adicione o que achar necessário)
+        "STEREOTAXIA", "BIOPSIA"
+    ]
     return any(keyword in remove_accents(exam_text).upper() for keyword in target_keywords)
 
 def download_pdf_from_url(url: str, cookies: list, save_path: str) -> bool:

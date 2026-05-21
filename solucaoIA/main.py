@@ -3,8 +3,8 @@ import asyncio
 import time
 from core import read_patients_from_gsheets, update_sheet_status, process_patient_exams
 from ai_fallback import run_ai_batch_rescue
-from data_manager import read_pendentes_ia, seed_pendentes_ia_from_patients
-from config import DOWNLOAD_DIR, HISTORY_FILE, SHEET_URL, AGENT_ONLY_MODE
+from data_manager import seed_pendentes_ia_from_patients
+from config import DOWNLOAD_DIR, HISTORY_FILE, SHEET_URL, AGENT_ONLY_MODE, BROWSER_USE_API_KEY
 
 def run_automation():
     start_time = time.time()
@@ -74,23 +74,16 @@ def run_automation():
         print("[SISTEMA] Iniciando Agente de IA em modo exclusivo...")
     else:
         print("[SISTEMA] Iniciando Agente de IA para limpar a fila de erros...")
-    
-    res_ia = asyncio.run(run_ai_batch_rescue())
+
+    res_ia = asyncio.run(run_ai_batch_rescue(browser_use_api_key=BROWSER_USE_API_KEY))
 
     if res_ia:
         metricas["sucesso_download_agente_ia"] += res_ia.get("sucesso_ia", 0)
         metricas["falha_absoluta_exames"] += res_ia.get("falha_ia", 0)
 
-    # 3. VERIFICAÇÃO FINAL E RELATÓRIO
-    print("\n[SISTEMA] Verificação final de pendências para atualizar o Sheets...")
-    fila_pos_ia = read_pendentes_ia()
-    
-    for p_info in pacientes:
-        nome_paciente, row_idx = p_info["nome"], p_info["sheet_row"]
-        ainda_tem_erro = any(item.get("nome") == nome_paciente for item in fila_pos_ia)
-        
-        if not ainda_tem_erro:
-            update_sheet_status(SHEET_URL, row_idx, 0)
+    # 3. RELATÓRIO FINAL (SEM ATUALIZAR SHEETS)
+    print("\n[SISTEMA] Gerando relatório de execução...")
+
 
     tempo_total_segundos = time.time() - start_time
     minutos = int(tempo_total_segundos // 60)

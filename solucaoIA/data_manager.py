@@ -67,7 +67,7 @@ def seed_pendentes_ia_from_patients(pacientes):
             "cpf": cpf,
             "exam_history_id": exam_history_id,
             "data_exame": "N/A",
-            "nome_exame": "BUSCA_COMPLETA_MAMA_2024_PLUS"
+            "nome_exame": "BUSCA_POR_EXAMES_DE_MAMA (MAMA, MAMOGRAFIA, ULTRASSONOGRAFIA, ECOGRAFIA, IMPLANTE)"
         })
 
     with open(PENDENTES_IA_FILE, 'w', encoding='utf-8') as f:
