@@ -1,7 +1,8 @@
 import os
 import json
 import unicodedata
-from config import HISTORY_FILE, PENDENTES_IA_FILE
+from config import HISTORY_FILE, PENDENTES_IA_FILE, ERROS_AGENTE_FILE
+
 
 def remove_accents(input_str):
     if not input_str: return ""
@@ -49,25 +50,60 @@ def clear_pendentes_ia():
     with open(PENDENTES_IA_FILE, 'w', encoding='utf-8') as f:
         json.dump([], f, indent=4, ensure_ascii=False)
 
+
+def write_erro_agente(dados_erro):
+    """Registra erros do agente em arquivo JSON."""
+    erros = read_erros_agente()
+
+    if not any(item.get("exam_history_id") == dados_erro.get("exam_history_id") for item in erros):
+        erros.append(dados_erro)
+        with open(ERROS_AGENTE_FILE, 'w', encoding='utf-8') as f:
+            json.dump(erros, f, indent=4, ensure_ascii=False)
+
+
+def read_erros_agente():
+    """Lê erros do agente."""
+    if not os.path.exists(ERROS_AGENTE_FILE):
+        return []
+    try:
+        with open(ERROS_AGENTE_FILE, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    except:
+        return []
+
+
+def clear_erros_agente():
+    """Limpa arquivo de erros."""
+    with open(ERROS_AGENTE_FILE, 'w', encoding='utf-8') as f:
+        json.dump([], f, indent=4, ensure_ascii=False)
+
 def seed_pendentes_ia_from_patients(pacientes):
     """
     Cria uma pendência sintética por paciente para permitir execução agente-only
     sem depender de falha prévia do RPA.
     """
     lista = []
+    history = read_download_history()
+
     for p in pacientes:
         nome = str(p.get("nome", "")).strip()
         cpf = str(p.get("cpf", "")).strip()
         if not nome:
             continue
 
-        exam_history_id = f"AGENTONLY-{remove_accents(nome)}-{cpf or 'SEMCPF'}"
+        data_exame = p.get("data_exame", "N/A")
+        exam_history_id = f"AGENTONLY-{remove_accents(nome)}-{cpf}-{data_exame}"
+
+        if exam_history_id in history:
+            print(f"    [SKIP] Paciente {nome} - {data_exame} já foi processado. Ignorando...")
+            continue
+
         lista.append({
             "nome": nome,
             "cpf": cpf,
             "exam_history_id": exam_history_id,
-            "data_exame": "N/A",
-            "nome_exame": "BUSCA_POR_EXAMES_DE_MAMA (MAMA, MAMOGRAFIA, ULTRASSONOGRAFIA, ECOGRAFIA, IMPLANTE)"
+            "data_exame": data_exame,
+            "nome_exame": "BUSCA_POR_EXAMES_DE_MAMA (MAMA, MAMO, MAMMO, MMG, BREAST, AXILA, IMPLANT, NODULO, ECOGRAFIA, ULTRASSONOGRAFIA)"
         })
 
     with open(PENDENTES_IA_FILE, 'w', encoding='utf-8') as f:
