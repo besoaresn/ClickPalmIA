@@ -89,57 +89,59 @@ async def run_ai_batch_rescue() -> dict:
             browser = Browser(headless=True)
 
             task_prompt = f"""
-            Baixar {len(exames)} exame(s) de mama do paciente: {nome_normalizado}
+            Download {len(exames)} breast exam(s) for patient: {nome_normalizado}
 
-            ACESSO
+            ACCESS
             - Site: {SITE_URL}
-            - Usuário: {USER}
-            - Senha: {PASS}
+            - Username: {USER}
+            - Password: {PASS}
 
-            EXAMES A BUSCAR ({len(exames)} no total)
+            EXAMS TO DOWNLOAD ({len(exames)} total)
             {exames_texto}
 
-            PASSO A PASSO
+            STEP BY STEP
 
             1. LOGIN
-               - Acesse o site
-               - Faça login com as credenciais fornecidas
+               - Access the site
+               - Login with the provided credentials
 
-            2. BUSCA DO PACIENTE (máximo 3 tentativas)
-               - Tentativa 1: busque "{nome_normalizado}" (completo)
-               - Tentativa 2: busque apenas o SOBRENOME
-               - Tentativa 3: busque apenas o PRIMEIRO NOME
-               - Se não encontrar: RESPONDA com ID_EXTRAIDO: NAO_ENCONTRADO
+            2. FIND PATIENT (max 3 attempts)
+               - Attempt 1: search "{nome_normalizado}" (full name)
+               - Attempt 2: search FIRST NAME only
+               - If not found: RESPOND with ID_EXTRAIDO: NAO_ENCONTRADO
 
-            3. ABRA O PRONTUÁRIO
-               - Clique no paciente encontrado
-               - SALVE o ID numérico do paciente
+            3. OPEN PATIENT RECORD
+               - Click on the found patient
+               - SAVE the numeric patient ID
 
-            4. ANTES DOS DOWNLOADS
-               Injete este código via evaluate:
-               window.print=function(){{return false;}};window.open=async function(url){{if(url.toLowerCase().includes('showreport.htm')){{window.location.href=url;return null;}}let pdfUrl=url;try{{const res=await fetch(url,{{credentials:'include'}});const text=await res.text();const match=text.match(/src=["']([^"']*(?:GetLatestReportStream|ReportService)[^"']*)["']/i);if(match){{let ext=match[1];pdfUrl=ext.startsWith('/')?window.location.origin+ext:ext;}}}}catch(e){{}}fetch(pdfUrl,{{credentials:'include'}}).then(r=>r.blob()).then(b=>{{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='resgate_ia.pdf';document.body.appendChild(a);a.click()}});return null;}};
+            4. INJECT ONCE (do this only one time, before any download)
+                Inject via evaluate:
+                window.print=function(){{return false;}};window.open=async function(url){{if(url.toLowerCase().includes('showreport.htm')){{window.location.href=url;return null;}}let pdfUrl=url;try{{const res=await fetch(url,{{credentials:'include'}});const text=await res.text();const match=text.match(/src=["']([^"']*(?:GetLatestReportStream|ReportService)[^"']*)["']/i);if(match){{let ext=match[1];pdfUrl=ext.startsWith('/')?window.location.origin+ext:ext;}}}}catch(e){{}}fetch(pdfUrl,{{credentials:'include'}}).then(r=>r.blob()).then(b=>{{const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='resgate_ia.pdf';document.body.appendChild(a);a.click()}});return null;}};
+                IMPORTANT: If you have already injected this script in a previous step,
+                DO NOT inject again. Proceed directly to clicking "Imprimir".
 
-            5. DOWNLOAD DOS EXAMES
-               - Para CADA exame na lista acima:
-                 a) Localize o exame pela data e nome
-                 b) Clique em "Imprimir"
-                 c) Aguarde 2 segundos
-                 d) O PDF será baixado automaticamente
-                 e) Retorne para a lista de exames
-                 f) Próximo exame
+            5. DOWNLOAD EXAMS
+               - For EACH exam in the list above:
+                 a) Locate the exam by date and name
+                 b) Click the exam to open it — wait for page to load
+                 c) Click "Imprimir" — this is a separate action after the page loads
+                 d) Wait 3 seconds
+                 e) PDF will download automatically
+                 f) Navigate BACK to the exam list
+                 g) Next exam
 
-            6. DETECÇÃO DE ERROS
-               - Se vir "não está disponível": o laudo não existe, continue
-               - Se a página não mudar: o PDF já baixou em background, continue
-               - Se abrir HTML: tente salvar como PDF manualmente
+            6. ERROR HANDLING
+               - If you see "não está disponível": report does not exist, continue
+               - If page did not change: PDF already downloaded in background, continue
+               - If HTML page opened: try to save as PDF manually
 
-            7. CONCLUSÃO
-               - Após processar TODOS os {len(exames)} exames
-               - Responda com o formato abaixo
+            7. FINISH
+               - After processing ALL {len(exames)} exams
+               - Respond with the format below
 
-            ✅ RESPOSTA OBRIGATÓRIA
-            ID_EXTRAIDO: [número do paciente ou NAO_ENCONTRADO]
-            EXAMES_INDISPONIVEIS: [nomes dos exames indisponíveis ou 'Nenhum']
+            REQUIRED RESPONSE
+            ID_EXTRAIDO: [patient number or NAO_ENCONTRADO]
+            EXAMES_INDISPONIVEIS: [unavailable exam names or 'Nenhum']
             """
 
             estado_escuta = {"ativo": True}
@@ -150,7 +152,7 @@ async def run_ai_batch_rescue() -> dict:
                     browser=browser,
                     use_vision=False,
                     vision_detail_level="low",
-                    max_actions=20
+                    max_actions=50
           )
             history = await agent.run()
             final_result = history.final_result() or ""
