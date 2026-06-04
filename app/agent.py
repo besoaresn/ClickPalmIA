@@ -32,6 +32,7 @@ async def run_patient(browser: Browser, llm: ChatGoogle, paciente: Paciente) -> 
         tools=tools,
         output_model_schema=SaidaAgente,
         use_vision=False,
+        temperature=0.1
     )
     history = await agent.run(max_steps=MAX_STEPS)
     saida = history.structured_output
