@@ -5,6 +5,7 @@ Fluxo:  load_queue -> open_browser -> process_patient --(loop)--> finalize
 Resumo/idempotência vêm do STATUS da planilha: paciente concluído sai da fila
 (STATUS->0), então re-executar o lote retoma de onde parou.
 """
+import asyncio
 from typing import TypedDict
 
 from langgraph.graph import StateGraph, START, END
@@ -78,6 +79,10 @@ class Pipeline:
         if self.browser:
             try:
                 await self.browser.kill()
+                # Dá tempo dos transports do subprocess (Chromium) fecharem antes
+                # de o loop encerrar -> reduz o ruído "I/O operation on closed
+                # pipe" do Proactor (Windows + Python 3.13) no fim do processo.
+                await asyncio.sleep(0.25)
             except Exception:
                 pass
 

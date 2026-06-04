@@ -27,9 +27,11 @@ STEPS
    try the FIRST NAME only. If still not found, finish with nao_encontrado=true.
 3. OPEN the patient record and READ the numeric patient ID (digits only). Keep it.
 4. LIST EXAMS and select the targets: exams from year {EXAM_YEAR_CUTOFF} onward whose
-   name matches breast keywords ({_KEYWORDS}). SKIP image-only cards (marked
-   "apenas imagens" / "somente imagens"). Process EVERY distinct target exam —
-   different dates of the same exam name are DIFFERENT exams (do not skip them).
+   name matches breast keywords ({_KEYWORDS}). Only SKIP cards explicitly marked
+   "apenas imagens". Cards marked "somente registro"/"somente resultado" ARE targets:
+   open them, the tool decides if the report is valid. Process EVERY distinct target —
+   two cards with the SAME name AND SAME date are still DIFFERENT exams (process both);
+   the tool deduplicates by report content, so never skip a card yourself as a "duplicate".
 5. For EACH target exam:
    a) Open the exam, then click "Imprimir" to open the report (it opens in a new tab).
    b) Call the tool `download_exam_report` with nome_paciente, the numeric id_paciente,
@@ -45,6 +47,8 @@ STEPS
 
 RULES
 - Do NOT try to download PDFs yourself or inject scripts: always use `download_exam_report`.
+- Do NOT use the extract / extract_structured_data action: read the exam list directly
+  from the page and click the cards (extract is slow and burns the token budget).
 - If a tool says JA_BAIXADO / IGNORADO / INDISPONIVEL, that exam is handled — move on.
 - Do NOT call switch_tab after closing the report tab; if you see a "Cannot switch tabs"
   / target detached warning, ignore it and continue with the next exam.

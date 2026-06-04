@@ -7,6 +7,8 @@ para esta tool determinística, que reaproveita a lógica do RPA maduro via CDP.
 """
 import os
 import re
+import asyncio
+import hashlib
 from datetime import datetime
 
 from pydantic import BaseModel, Field
@@ -73,9 +75,22 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
 
     id_norm = (re.sub(r"\D", "", params.id_paciente) or "0").zfill(16)
     data_norm = remove_accents(params.data_exame).strip()
-    # hist_id INCLUI a data: exames de mesmo nome em datas diferentes são
-    # distintos (sem isto, o 2º vira JA_BAIXADO e a contagem fica menor que a do RPA).
-    hist_id = f"{remove_accents(params.nome_paciente)}-{id_norm}-{data_norm}-{remove_accents(params.nome_exame)}".upper()
+
+    # Lê o laudo ANTES da checagem de histórico: o texto alimenta as checagens
+    # de skip/indisponível E vira parte da chave de deduplicação.
+    texto = await read_report_text(cdp_session)
+    texto_norm = remove_accents(texto).lower()
+
+    # hist_id = paciente-id-data-nome + ASSINATURA do conteúdo do laudo. Dois
+    # exames de MESMO nome E mesma data (ex.: dois "US AXILAR UNILATERAL" no
+    # mesmo dia) têm laudos diferentes -> assinaturas diferentes -> contam como
+    # distintos (sem isto, o 2º virava JA_BAIXADO e a contagem ficava < RPA).
+    # Sem texto de laudo, cai na chave nome+data (comportamento anterior).
+    sig = hashlib.sha1(texto_norm.encode("utf-8")).hexdigest()[:12] if texto_norm.strip() else ""
+    hist_id = "-".join(filter(None, [
+        remove_accents(params.nome_paciente), id_norm, data_norm,
+        remove_accents(params.nome_exame), sig,
+    ])).upper()
 
     # Anti-duplicação entre execuções (e dentro da mesma, p/ cards repetidos).
     if hist_id in read_download_history():
@@ -85,9 +100,6 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
         ))
 
     _registrar("alvo")
-
-    texto = await read_report_text(cdp_session)
-    texto_norm = remove_accents(texto).lower()
 
     # Carta de procedimento (localização pré-op, "PREZADO(A) COLEGA") -> não é
     # exame diagnóstico, não enviar.
@@ -124,7 +136,10 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
             f"relatório está aberto/focado e tente novamente, ou siga para o próximo."
         ))
 
-    ok = upload_to_api(save_path, ID_PLATAFORMA, id_norm, params.nome_exame)
+    # upload é requests síncrono (login + POST, até ~150s); roda em thread para
+    # não travar o event loop do browser (era a origem dos ScreenshotWatchdog
+    # >15s / "Clean screenshot timed out" / duplicate response no log).
+    ok = await asyncio.to_thread(upload_to_api, save_path, ID_PLATAFORMA, id_norm, params.nome_exame)
     if ok:
         write_download_history(hist_id)
         _registrar("baixado", download_method=metodo)

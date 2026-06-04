@@ -12,17 +12,39 @@ from app.tools import tools
 MAX_STEPS = 60
 
 
+def _make_llm(model: str) -> ChatGoogle:
+    """ChatGoogle com thinking contido e orçamento de saída folgado.
+
+    Sem isto o flash-lite (Gemini 3) usa thinking dinâmico (~8k tokens) com
+    max_output_tokens=8096 default -> o 'thinking' consome quase todo o
+    orçamento e o JSON da ação chega truncado (finish_reason=MAX_TOKENS ->
+    'Failed to parse JSON response'). thinking_level='low' segura o thinking e
+    max_output_tokens alto dá folga para a resposta.
+
+    temperature baixa = agente mais determinístico. (Tem efeito aqui, no LLM;
+    passar temperature= ao Agent é no-op — cai no **kwargs e é ignorado.)"""
+    kwargs: dict = dict(
+        model=model,
+        api_key=GEMINI_API_KEY,
+        temperature=0.1,
+        max_output_tokens=16384,
+    )
+    if "gemini-3" in model and "flash" in model:
+        kwargs["thinking_level"] = "low"      # Gemini 3 Flash: segura o thinking
+    elif "gemini-2.5" in model:
+        kwargs["thinking_budget"] = 2048      # Gemini 2.5: limita o thinking
+    return ChatGoogle(**kwargs)
+
+
 def build_llm() -> ChatGoogle:
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY não configurada no .env")
-    # temperature baixa = agente mais determinístico. (Tem efeito aqui, no LLM;
-    # passar temperature= ao Agent é no-op — cai no **kwargs e é ignorado.)
-    return ChatGoogle(model=GEMINI_MODEL, api_key=GEMINI_API_KEY, temperature=0.1)
+    return _make_llm(GEMINI_MODEL)
 
 
 def build_fallback_llm() -> ChatGoogle:
     """LLM de reserva para quando o principal retorna 503 (alta demanda)."""
-    return ChatGoogle(model=GEMINI_FALLBACK_MODEL, api_key=GEMINI_API_KEY, temperature=0.1)
+    return _make_llm(GEMINI_FALLBACK_MODEL)
 
 
 def build_browser() -> Browser:
