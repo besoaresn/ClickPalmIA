@@ -3,7 +3,7 @@ e devolve a saída estruturada (SaidaAgente)."""
 from browser_use import Agent, Browser, ChatGoogle
 
 from app.config import (
-    GEMINI_API_KEY, GEMINI_MODEL, HEADLESS_MODE, DOWNLOAD_DIR,
+    GEMINI_API_KEY, GEMINI_MODEL, GEMINI_FALLBACK_MODEL, HEADLESS_MODE, DOWNLOAD_DIR,
 )
 from app.models import Paciente, SaidaAgente
 from app.prompts import build_task
@@ -20,6 +20,11 @@ def build_llm() -> ChatGoogle:
     return ChatGoogle(model=GEMINI_MODEL, api_key=GEMINI_API_KEY, temperature=0.1)
 
 
+def build_fallback_llm() -> ChatGoogle:
+    """LLM de reserva para quando o principal retorna 503 (alta demanda)."""
+    return ChatGoogle(model=GEMINI_FALLBACK_MODEL, api_key=GEMINI_API_KEY, temperature=0.1)
+
+
 def build_browser() -> Browser:
     """Uma única sessão de browser para o lote (login uma vez, como o RPA maduro).
 
@@ -29,7 +34,8 @@ def build_browser() -> Browser:
     return Browser(headless=HEADLESS_MODE, downloads_path=DOWNLOAD_DIR, keep_alive=True)
 
 
-async def run_patient(browser: Browser, llm: ChatGoogle, paciente: Paciente) -> SaidaAgente:
+async def run_patient(browser: Browser, llm: ChatGoogle, paciente: Paciente,
+                      fallback_llm: ChatGoogle | None = None) -> SaidaAgente:
     task = build_task(paciente.nome, paciente.cpf)
     agent = Agent(
         task=task,
@@ -38,6 +44,7 @@ async def run_patient(browser: Browser, llm: ChatGoogle, paciente: Paciente) -> 
         tools=tools,
         output_model_schema=SaidaAgente,
         use_vision=False,
+        fallback_llm=fallback_llm,
     )
     history = await agent.run(max_steps=MAX_STEPS)
     saida = history.structured_output

@@ -27,14 +27,16 @@ STEPS
    try the FIRST NAME only. If still not found, finish with nao_encontrado=true.
 3. OPEN the patient record and READ the numeric patient ID (digits only). Keep it.
 4. LIST EXAMS and select the targets: exams from year {EXAM_YEAR_CUTOFF} onward whose
-   name matches breast keywords ({_KEYWORDS}). Ignore "apenas imagens" cards.
+   name matches breast keywords ({_KEYWORDS}). SKIP image-only cards (marked
+   "apenas imagens" / "somente imagens"). Process EVERY distinct target exam —
+   different dates of the same exam name are DIFFERENT exams (do not skip them).
 5. For EACH target exam:
-   a) Open the exam, then click "Imprimir" to open the report. Make sure the report
-      tab/view is in focus.
+   a) Open the exam, then click "Imprimir" to open the report (it opens in a new tab).
    b) Call the tool `download_exam_report` with nome_paciente, the numeric id_paciente,
-      nome_exame (and data_exame if known). The tool downloads + uploads and decides
-      skip/unavailable on its own — just read its message.
-   c) Go BACK to the exam list and continue with the next target.
+      nome_exame AND data_exame (always include the date). The tool downloads + uploads
+      and decides skip/unavailable on its own — just read its message.
+   c) CLOSE the report tab. Do NOT call switch_tab — focus returns to the patient tab
+      automatically. Then select the next target exam.
 6. FINISH with the structured output:
    - id_paciente: the numeric patient id (or empty if not found)
    - nao_encontrado: true only if the patient was not found
@@ -44,8 +46,7 @@ STEPS
 RULES
 - Do NOT try to download PDFs yourself or inject scripts: always use `download_exam_report`.
 - If a tool says JA_BAIXADO / IGNORADO / INDISPONIVEL, that exam is handled — move on.
-- After `download_exam_report` returns, go BACK to the exam list (or close the report
-  tab). Do NOT switch tabs unnecessarily; if you see a "Cannot switch tabs" / target
-  detached warning, just ignore it and continue with the next exam.
-- Process every target exam before finishing.
+- Do NOT call switch_tab after closing the report tab; if you see a "Cannot switch tabs"
+  / target detached warning, ignore it and continue with the next exam.
+- Process every target exam before finishing — do not stop early.
 """.strip()

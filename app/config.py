@@ -30,6 +30,8 @@ SEARCH_BAR_SELECTOR = "sptGeneralDetailsInput"
 # --- LLM (Gemini) ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
+# Modelo de fallback usado quando o principal retorna 503/erro (alta demanda).
+GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.5-flash")
 
 # --- Google Sheets ---
 SHEET_URL = os.getenv("SHEET_URL", os.getenv("GOOGLE_SHEET_URL", ""))

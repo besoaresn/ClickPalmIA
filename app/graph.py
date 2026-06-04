@@ -13,7 +13,8 @@ from app.config import SHEET_URL
 from app.models import Paciente, SaidaAgente
 from app.reporting import ReportManager
 from app.sheets import read_patients_from_gsheets, update_sheet_status
-from app.agent import build_llm, build_browser, run_patient
+from app.agent import build_llm, build_fallback_llm, build_browser, run_patient
+from app.runstate import RUN
 
 
 class PipelineState(TypedDict, total=False):
@@ -25,6 +26,7 @@ class PipelineState(TypedDict, total=False):
 class Pipeline:
     def __init__(self):
         self.llm = build_llm()
+        self.fallback_llm = build_fallback_llm()
         self.browser = None
         self.report = ReportManager()
         self._finalized = False
@@ -51,8 +53,10 @@ class Pipeline:
         pac = Paciente(**state["pacientes"][i])
         print("=" * 60)
         print(f"[{i + 1}/{len(state['pacientes'])}] Processando: {pac.nome}")
+        # A tool escreve as contagens diretamente no ReportManager deste paciente.
+        RUN.bind(self.report, pac.nome, pac.cpf)
         try:
-            saida = await run_patient(self.browser, self.llm, pac)
+            saida = await run_patient(self.browser, self.llm, pac, fallback_llm=self.fallback_llm)
             self._persist(pac, saida, erro="")
         except Exception as e:
             print(f"ERRO no paciente {pac.nome}: {e}")
@@ -113,21 +117,13 @@ class Pipeline:
             self.report.registrar_paciente_processado()
             return
 
-        baixados = max(0, saida.exames_baixados)
-        indisponiveis = saida.exames_indisponiveis or []
-        self.report.registrar_alvos(nome, baixados + len(indisponiveis))
-        for _ in range(baixados):
-            self.report.registrar_baixado(nome)
-        for nome_exame in indisponiveis:
-            self.report.registrar_erro(
-                paciente=nome, cpf=cpf, data_exame="", nome_exame=nome_exame,
-                motivo="Portal informou que o laudo não está disponível para exibição.",
-                etapa="relatorio_indisponivel",
-            )
-
-        # Sucesso pleno -> sai da fila. Falha parcial (indisponíveis) -> mantém
-        # STATUS=1 para reprocessar depois.
-        if not indisponiveis:
+        # As contagens (alvos/baixados/ignorados/indisponíveis/falhas) já foram
+        # gravadas pela tool download_exam_report (fonte de verdade). Aqui só
+        # decidimos o STATUS da planilha a partir das falhas reais registradas.
+        falhas = self.report.por_paciente.get(nome, {}).get("falhas", 0)
+        if falhas == 0:
+            # Sucesso pleno -> sai da fila. Com falhas/indisponíveis, mantém
+            # STATUS=1 para reprocessar depois.
             update_sheet_status(SHEET_URL, row, 0)
         self.report.registrar_paciente_processado()
 
