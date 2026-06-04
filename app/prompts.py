@@ -28,10 +28,8 @@ STEPS
 3. OPEN the patient record and READ the numeric patient ID (digits only). Keep it.
 4. LIST EXAMS and select the targets: exams from year {EXAM_YEAR_CUTOFF} onward whose
    name matches breast keywords ({_KEYWORDS}). Only SKIP cards explicitly marked
-   "apenas imagens". Cards marked "somente registro"/"somente resultado" ARE targets:
-   open them, the tool decides if the report is valid. Process EVERY distinct target —
-   two cards with the SAME name AND SAME date are still DIFFERENT exams (process both);
-   the tool deduplicates by report content, so never skip a card yourself as a "duplicate".
+   "apenas imagens"; cards marked "somente registro"/"somente resultado" ARE targets.
+   Make ONE list of the distinct target exams up front and process each exam ONCE.
 5. For EACH target exam:
    a) Open the exam, then click "Imprimir" to open the report (it opens in a new tab).
    b) Call the tool `download_exam_report` with nome_paciente, the numeric id_paciente,
@@ -49,8 +47,13 @@ RULES
 - Do NOT try to download PDFs yourself or inject scripts: always use `download_exam_report`.
 - Do NOT use the extract / extract_structured_data action: read the exam list directly
   from the page and click the cards (extract is slow and burns the token budget).
-- If a tool says JA_BAIXADO / IGNORADO / INDISPONIVEL, that exam is handled — move on.
-- Do NOT call switch_tab after closing the report tab; if you see a "Cannot switch tabs"
-  / target detached warning, ignore it and continue with the next exam.
-- Process every target exam before finishing — do not stop early.
+- Once inside the portal, STAY logged in. A failed upload does NOT mean the session was
+  lost: NEVER go back to the login page, NEVER re-login, NEVER re-search the patient
+  mid-run. Just continue with the next exam.
+- Every tool answer (OK / UPLOAD_FALHOU / JA_BAIXADO / JA_PROCESSADO / IGNORADO /
+  INDISPONIVEL) means that exam is DONE — never open or download that exam again.
+- If you see "focus target detached" / "browser not connected" / "Cannot switch tabs":
+  ignore it, close the report tab if it is open, and continue with the next exam.
+- Attempt each target exam exactly ONCE. As soon as every target has been attempted,
+  FINISH with the structured output — do not restart, re-login, or reprocess.
 """.strip()

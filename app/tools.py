@@ -8,7 +8,6 @@ para esta tool determinística, que reaproveita a lógica do RPA maduro via CDP.
 import os
 import re
 import asyncio
-import hashlib
 from datetime import datetime
 
 from pydantic import BaseModel, Field
@@ -75,31 +74,36 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
 
     id_norm = (re.sub(r"\D", "", params.id_paciente) or "0").zfill(16)
     data_norm = remove_accents(params.data_exame).strip()
+    # Chave estável (paciente-id-data-nome). Inclui a data: exames de mesmo nome
+    # em datas diferentes são distintos (sem isto o 2º virava JA_BAIXADO).
+    hist_id = f"{remove_accents(params.nome_paciente)}-{id_norm}-{data_norm}-{remove_accents(params.nome_exame)}".upper()
 
-    # Lê o laudo ANTES da checagem de histórico: o texto alimenta as checagens
-    # de skip/indisponível E vira parte da chave de deduplicação.
-    texto = await read_report_text(cdp_session)
-    texto_norm = remove_accents(texto).lower()
+    # Já TENTADO nesta execução (mesmo que o upload tenha falhado)? Não
+    # reprocessa. Sem isto, quando o upload cai (503) o agente reabre o mesmo
+    # exame em loop e a contagem infla (foi a causa de "alvos: 10" num paciente
+    # de 6). Cada alvo é tentado no máximo 1x por execução, como no RPA maduro.
+    if RUN.ja_processou(hist_id):
+        return ActionResult(extracted_content=(
+            f"JA_PROCESSADO: '{params.nome_exame}' ({params.data_exame}) já foi tentado nesta "
+            f"execução. NÃO reabra nem reprocesse — vá para o PRÓXIMO exame ainda não tentado "
+            f"ou finalize se já tentou todos."
+        ))
 
-    # hist_id = paciente-id-data-nome + ASSINATURA do conteúdo do laudo. Dois
-    # exames de MESMO nome E mesma data (ex.: dois "US AXILAR UNILATERAL" no
-    # mesmo dia) têm laudos diferentes -> assinaturas diferentes -> contam como
-    # distintos (sem isto, o 2º virava JA_BAIXADO e a contagem ficava < RPA).
-    # Sem texto de laudo, cai na chave nome+data (comportamento anterior).
-    sig = hashlib.sha1(texto_norm.encode("utf-8")).hexdigest()[:12] if texto_norm.strip() else ""
-    hist_id = "-".join(filter(None, [
-        remove_accents(params.nome_paciente), id_norm, data_norm,
-        remove_accents(params.nome_exame), sig,
-    ])).upper()
-
-    # Anti-duplicação entre execuções (e dentro da mesma, p/ cards repetidos).
+    # Já baixado em execução anterior (histórico persistente entre runs).
     if hist_id in read_download_history():
+        RUN.marcar_processado(hist_id)
         return ActionResult(extracted_content=(
             f"JA_BAIXADO: '{params.nome_exame}' ({params.data_exame}) já foi enviado antes. "
             f"Pule para o próximo exame."
         ))
 
+    # Marca ANTES de processar: aconteça o que acontecer (sucesso, indisponível
+    # ou upload falho), este exame não é tentado de novo nesta execução.
+    RUN.marcar_processado(hist_id)
     _registrar("alvo")
+
+    texto = await read_report_text(cdp_session)
+    texto_norm = remove_accents(texto).lower()
 
     # Carta de procedimento (localização pré-op, "PREZADO(A) COLEGA") -> não é
     # exame diagnóstico, não enviar.
