@@ -1,5 +1,0 @@
-browser-use
-pandas
-gspread
-requests
-python-dotenv

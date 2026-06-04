@@ -1,0 +1,17 @@
+# Agente que dirige o browser (CDP) + LLM Gemini
+browser-use==0.12.9
+
+# Orquestração (state machine, loop por paciente)
+langgraph==1.2.4
+
+# Conector Gemini usado pelo browser-use (ChatGoogle)
+langchain-google-genai==4.2.4
+
+# Integrações
+gspread==6.2.1
+requests==2.33.0
+python-dotenv==1.2.2
+pydantic==2.12.5
+
+# Dev/testes
+pytest==9.0.1

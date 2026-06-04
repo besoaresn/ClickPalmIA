@@ -1,0 +1,23 @@
+# Ambiente
+.venv/
+.idea/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Segredos
+.env
+credenciais.json
+
+# Dados em runtime (downloads, histórico, relatórios)
+data/
+downloads/
+reports/
+*.log
+relatorio_execucao.txt
+
+# Estado legado da versão antiga
+solucaoIA/historico_downloads.json
+solucaoIA/pendentes_ia.json
+solucaoIA/erros_agente.json
+solucaoIA/downloads/
