@@ -15,12 +15,18 @@ MAX_STEPS = 60
 def build_llm() -> ChatGoogle:
     if not GEMINI_API_KEY:
         raise RuntimeError("GEMINI_API_KEY não configurada no .env")
-    return ChatGoogle(model=GEMINI_MODEL, api_key=GEMINI_API_KEY)
+    # temperature baixa = agente mais determinístico. (Tem efeito aqui, no LLM;
+    # passar temperature= ao Agent é no-op — cai no **kwargs e é ignorado.)
+    return ChatGoogle(model=GEMINI_MODEL, api_key=GEMINI_API_KEY, temperature=0.1)
 
 
 def build_browser() -> Browser:
-    """Uma única sessão de browser para o lote (login uma vez, como o RPA maduro)."""
-    return Browser(headless=HEADLESS_MODE, downloads_path=DOWNLOAD_DIR)
+    """Uma única sessão de browser para o lote (login uma vez, como o RPA maduro).
+
+    keep_alive=True é ESSENCIAL: sem isso, o Agent mata o browser ao fim de cada
+    run() (browser_profile.keep_alive=False -> session.kill()), e o próximo
+    paciente roda em cima de um browser desconectado ('browser not connected')."""
+    return Browser(headless=HEADLESS_MODE, downloads_path=DOWNLOAD_DIR, keep_alive=True)
 
 
 async def run_patient(browser: Browser, llm: ChatGoogle, paciente: Paciente) -> SaidaAgente:
@@ -32,7 +38,6 @@ async def run_patient(browser: Browser, llm: ChatGoogle, paciente: Paciente) -> 
         tools=tools,
         output_model_schema=SaidaAgente,
         use_vision=False,
-        temperature=0.1
     )
     history = await agent.run(max_steps=MAX_STEPS)
     saida = history.structured_output

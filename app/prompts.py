@@ -44,5 +44,8 @@ STEPS
 RULES
 - Do NOT try to download PDFs yourself or inject scripts: always use `download_exam_report`.
 - If a tool says JA_BAIXADO / IGNORADO / INDISPONIVEL, that exam is handled — move on.
+- After `download_exam_report` returns, go BACK to the exam list (or close the report
+  tab). Do NOT switch tabs unnecessarily; if you see a "Cannot switch tabs" / target
+  detached warning, just ignore it and continue with the next exam.
 - Process every target exam before finishing.
 """.strip()

@@ -27,6 +27,7 @@ class Pipeline:
         self.llm = build_llm()
         self.browser = None
         self.report = ReportManager()
+        self._finalized = False
 
     # --- nós ---
     async def load_queue(self, state: PipelineState) -> PipelineState:
@@ -59,17 +60,31 @@ class Pipeline:
         return {"idx": i + 1}
 
     async def finalize(self, state: PipelineState) -> PipelineState:
+        await self.shutdown()
+        return {}
+
+    async def shutdown(self) -> None:
+        """Fecha o browser e gera os relatórios. Idempotente: é chamado pelo nó
+        `finalize` (fluxo normal) E pelo `finally` do main (rede de segurança se
+        o grafo crashar no meio), mas só executa de fato uma vez."""
+        if self._finalized:
+            return
+        self._finalized = True
+
         if self.browser:
             try:
                 await self.browser.kill()
             except Exception:
                 pass
-        path_erros = self.report.salvar_erros()
-        path_final, conteudo = self.report.gerar_relatorio_final()
-        print("\n" + conteudo)
-        print(f"Relatório final: {path_final}")
-        print(f"Relatório de erros: {path_erros}")
-        return {}
+
+        try:
+            path_erros = self.report.salvar_erros()
+            path_final, conteudo = self.report.gerar_relatorio_final()
+            print("\n" + conteudo)
+            print(f"Relatório final: {path_final}")
+            print(f"Relatório de erros: {path_erros}")
+        except Exception as e:
+            print(f"ERRO ao gerar relatórios: {e}")
 
     # --- roteamento ---
     def route(self, state: PipelineState) -> str:

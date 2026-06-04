@@ -18,8 +18,13 @@ async def _run() -> None:
 
     pipeline = Pipeline()
     graph = build_graph(pipeline)
-    # recursion_limit alto: o grafo faz loop de 1 nó por paciente.
-    await graph.ainvoke({}, config={"recursion_limit": 10_000})
+    try:
+        # recursion_limit alto: o grafo faz loop de 1 nó por paciente.
+        await graph.ainvoke({}, config={"recursion_limit": 10_000})
+    finally:
+        # Rede de segurança: garante browser fechado + relatórios gerados mesmo
+        # se o grafo levantar exceção no meio do lote.
+        await pipeline.shutdown()
 
 
 def main() -> None:
