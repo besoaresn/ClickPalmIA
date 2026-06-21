@@ -25,31 +25,35 @@ LangGraph (state machine)
 - **Sem** injeção de JS via prompt e **sem** watchdog varrendo `%TEMP%` (a versão antiga).
 - **Sem** parsing por regex: o agente devolve `SaidaAgente` (Pydantic) via `output_model_schema`.
 
-### Por que não Playwright MCP?
-O browser-use 0.12 fala **CDP** direto. Playwright MCP + LangGraph tem bug conhecido
-de perda de sessão em loop ReAct e a extração de PDF deste portal (iframe `ReportService`,
-blob) exigiria tools customizadas de qualquer jeito — então a tool CDP é mais simples e robusta.
+## Documentação
+
+- [Fluxo do agente](docs/fluxo-agente.md): passo a passo técnico da execução,
+  da fila da planilha ao download, upload, relatórios e retomada.
+- [Quadro visual do fluxo](docs/fluxo-agente-board.svg): versão desenhada em
+  formato SVG, pronta para abrir no navegador ou importar em ferramentas como Miro.
+
 
 ## Estrutura
 
-| Arquivo | Papel |
+| Caminho | Papel |
 |---|---|
 | `app/main.py` | Entrypoint: monta e roda o grafo |
-| `app/graph.py` | LangGraph: fila → browser → loop por paciente → relatório |
-| `app/agent.py` | Monta o `Agent` (Gemini + tools) por paciente |
-| `app/tools.py` | `download_exam_report` — tool determinística (CDP) |
-| `app/extraction.py` | Estratégias de PDF via CDP (FETCH, HTML→PDF) |
-| `app/prompts.py` | Prompt da tarefa do agente |
-| `app/filters.py` | Filtros puros de exame (data/keyword/skip) — unit-testados |
-| `app/sheets.py` | Fila do Google Sheets (STATUS=1) + update de status |
-| `app/api_client.py` | Token + upload para a API ClickPalm |
-| `app/reporting.py` | `ReportManager` (relatórios de execução e de erros) |
-| `app/history.py` | Histórico anti-duplicação + normalização de nomes |
-| `app/config.py` | Env, seletores, keywords, timeouts |
-| `app/models.py` | Schemas Pydantic |
+| `app/pipeline/graph.py` | LangGraph: fila → browser → loop por paciente → relatório |
+| `app/agent/runner.py` | Monta o `Agent` (Gemini + tools) por paciente |
+| `app/agent/tools.py` | `download_exam_report` — tool determinística (CDP) |
+| `app/agent/extraction.py` | Estratégias de PDF via CDP (FETCH, HTML→PDF) |
+| `app/agent/prompts.py` | Prompt da tarefa do agente |
+| `app/domain/filters.py` | Filtros puros de exame (data/keyword/skip) — unit-testados |
+| `app/domain/history.py` | Histórico anti-duplicação + normalização de nomes |
+| `app/domain/models.py` | Schemas Pydantic |
+| `app/integrations/sheets.py` | Fila do Google Sheets (STATUS=1) + update de status |
+| `app/integrations/clickpalm.py` | Token + upload para a API ClickPalm |
+| `app/reporting/manager.py` | `ReportManager` (relatórios de execução e de erros) |
+| `app/core/config.py` | Env, seletores, keywords, timeouts |
+| `app/core/runstate.py` | Estado compartilhado entre grafo e tool durante um paciente |
 
-Os arquivos `api_client`, `reporting`, `history`, `filters`, `sheets` e as constantes de
-`config` são portados quase 1:1 do projeto `RPA_com_Agente_IA`.
+Os pacotes `integrations`, `reporting`, `domain` e `core` concentram as partes
+portadas quase 1:1 do projeto `RPA_com_Agente_IA`.
 
 ## Configuração
 

@@ -4,7 +4,7 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from app.filters import check_exam_date, is_relevant_exam, texto_indica_skip
+from app.domain.filters import check_exam_date, is_relevant_exam, texto_indica_skip
 
 
 def test_check_exam_date_corte_2024():

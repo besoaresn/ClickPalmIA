@@ -5,8 +5,8 @@ Uso:  python -m app.main
 import asyncio
 import os
 
-from app.config import SHEET_URL, GEMINI_API_KEY, USER, PASS
-from app.graph import Pipeline, build_graph
+from app.core.config import SHEET_URL, GEMINI_API_KEY, USER, PASS
+from app.pipeline.graph import Pipeline, build_graph
 
 
 def _avisar_config() -> None:
