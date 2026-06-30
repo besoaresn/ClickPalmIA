@@ -1,4 +1,4 @@
-# Extrator Agêntico de Exames (browser-use + Gemini + LangGraph)
+# Extrator Agêntico de Exames (browser-use + LLM + LangGraph)
 
 Extrai laudos de mama do portal HMV e envia para a API ClickPalm. Diferente de
 um RPA determinístico, aqui um **agente de IA dirige o browser** de ponta a ponta
@@ -12,7 +12,7 @@ do RPA maduro. Resultado: a adaptabilidade da IA + a robustez do código testado
 LangGraph (state machine)
   load_queue ──> open_browser ──> process ──(loop por paciente)──> finalize
                                      │
-                                     └─ Agent (browser-use + Gemini)
+                                     └─ Agent (browser-use + LLM)
                                           • navega/clica/busca  (ações nativas)
                                           • download_exam_report (tool nossa, via CDP)
                                               ├─ FETCH    : baixa o PDF do iframe/blob
@@ -39,7 +39,7 @@ LangGraph (state machine)
 |---|---|
 | `app/main.py` | Entrypoint: monta e roda o grafo |
 | `app/pipeline/graph.py` | LangGraph: fila → browser → loop por paciente → relatório |
-| `app/agent/runner.py` | Monta o `Agent` (Gemini + tools) por paciente |
+| `app/agent/runner.py` | Monta o `Agent` (Gemini ou AWS Bedrock + tools) por paciente |
 | `app/agent/tools.py` | `download_exam_report` — tool determinística (CDP) |
 | `app/agent/extraction.py` | Estratégias de PDF via CDP (FETCH, HTML→PDF) |
 | `app/agent/prompts.py` | Prompt da tarefa do agente |
@@ -69,6 +69,7 @@ Crie na raiz:
 ```env
 PORTAL_USER=...            # login do portal HMV (usado pelo agente)
 PORTAL_PASS=...
+LLM_PROVIDER=gemini        # gemini ou bedrock
 GEMINI_API_KEY=...
 GEMINI_MODEL=gemini-3.1-flash-lite
 CLICKPALM_LOGIN_URL=...
@@ -78,6 +79,32 @@ CLICKPALM_PASS=...
 SHEET_URL=https://docs.google.com/spreadsheets/d/SEU_ID/edit
 HEADLESS=false            # true = sem janela
 ```
+
+Para usar Claude via AWS Bedrock, troque o bloco de LLM:
+
+```env
+LLM_PROVIDER=bedrock
+BEDROCK_MODEL=us.anthropic.claude-opus-4-6-v1
+BEDROCK_FALLBACK_MODEL=us.anthropic.claude-sonnet-4-6
+BEDROCK_MAX_TOKENS=8192
+BEDROCK_RETRY_ATTEMPTS=3
+BEDROCK_AUTH_MODE=default
+AWS_REGION=us-east-1
+BEDROCK_API_KEY=          # opcional: API key do Bedrock
+AWS_BEARER_TOKEN_BEDROCK= # opcional: mesmo valor, nome oficial AWS
+AWS_ACCESS_KEY_ID=        # opcional: par IAM/STS
+AWS_SECRET_ACCESS_KEY=
+AWS_SESSION_TOKEN=        # preencher só se a credencial IAM/STS for temporária
+```
+
+O prefixo `us.` é o inference profile indicado pela AWS para usar o Opus 4.6
+nas regiões dos EUA, como `us-east-1`.
+O fallback usa Sonnet 4.6 para evitar que uma falha transitória `502/503` do
+Opus derrube o lote inteiro.
+Com `BEDROCK_AUTH_MODE=default`, o boto3 pode usar chaves no `.env`, perfil/SSO
+da AWS, role da máquina ou token/API key suportado pela configuração AWS local.
+Não coloque a API key do Bedrock em `AWS_ACCESS_KEY_ID`; ela deve ir em
+`AWS_BEARER_TOKEN_BEDROCK` ou `BEDROCK_API_KEY`.
 
 ## Executar
 

@@ -5,7 +5,9 @@ Uso:  python -m app.main
 import asyncio
 import os
 
-from app.core.config import SHEET_URL, GEMINI_API_KEY, USER, PASS
+from app.core.config import (
+    GEMINI_API_KEY, LLM_PROVIDER, SHEET_URL, USER, PASS,
+)
 from app.pipeline.graph import Pipeline, build_graph
 
 
@@ -27,8 +29,12 @@ def _avisar_config() -> None:
 
 
 async def _run() -> None:
-    if not GEMINI_API_KEY:
+    if LLM_PROVIDER == "gemini" and not GEMINI_API_KEY:
         print("ERRO: configure GEMINI_API_KEY no .env.")
+        return
+    valid_llm_providers = {"gemini", "bedrock", "aws_bedrock", "anthropic_bedrock", "claude_bedrock"}
+    if LLM_PROVIDER not in valid_llm_providers:
+        print("ERRO: LLM_PROVIDER inválido. Use 'gemini' ou 'bedrock'.")
         return
     if not SHEET_URL:
         print("ERRO: configure SHEET_URL no .env.")
@@ -48,7 +54,7 @@ async def _run() -> None:
 
 
 def main() -> None:
-    print("\n[INÍCIO] 🚀 Pipeline agêntico (browser-use + Gemini + LangGraph)")
+    print(f"\n[INÍCIO] 🚀 Pipeline agêntico (browser-use + {LLM_PROVIDER} + LangGraph)")
     asyncio.run(_run())
 
 

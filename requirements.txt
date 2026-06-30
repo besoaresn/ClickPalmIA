@@ -1,11 +1,11 @@
-# Agente que dirige o browser (CDP) + LLM Gemini
-browser-use==0.12.9
+# Agente que dirige o browser (CDP) + LLMs, incluindo AWS Bedrock
+browser-use[aws]==0.12.9
 uv==0.11.23
 
 # Orquestração (state machine, loop por paciente)
 langgraph==1.2.4
 
-# Conector Gemini usado pelo browser-use (ChatGoogle)
+# Conector Gemini usado pelo browser-use quando LLM_PROVIDER=gemini
 langchain-google-genai==4.2.4
 
 # Integrações

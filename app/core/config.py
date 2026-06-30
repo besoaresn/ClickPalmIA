@@ -34,11 +34,26 @@ PASS_FIELD_SELECTOR = "loginPassword"
 LOGIN_BUTTON_SELECTOR = "login-button"
 SEARCH_BAR_SELECTOR = "sptGeneralDetailsInput"
 
-# --- LLM (Gemini) ---
+# --- LLM ---
+LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini").strip().lower()
+
+# Gemini
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
 # Modelo de fallback usado quando o principal retorna 503/erro (alta demanda).
 GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.5-flash")
+
+# AWS Bedrock / Claude
+BEDROCK_MODEL = os.getenv("BEDROCK_MODEL", "us.anthropic.claude-opus-4-6-v1")
+BEDROCK_FALLBACK_MODEL = os.getenv("BEDROCK_FALLBACK_MODEL", "us.anthropic.claude-sonnet-4-6")
+BEDROCK_MAX_TOKENS = int(os.getenv("BEDROCK_MAX_TOKENS", "8192"))
+BEDROCK_RETRY_ATTEMPTS = int(os.getenv("BEDROCK_RETRY_ATTEMPTS", "3"))
+BEDROCK_AUTH_MODE = os.getenv("BEDROCK_AUTH_MODE", "default").strip().lower()
+BEDROCK_API_KEY = os.getenv("BEDROCK_API_KEY", os.getenv("AWS_BEARER_TOKEN_BEDROCK", ""))
+AWS_REGION = os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", ""))
+AWS_ACCESS_KEY_ID = os.getenv("AWS_ACCESS_KEY_ID", "")
+AWS_SECRET_ACCESS_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "")
+AWS_SESSION_TOKEN = os.getenv("AWS_SESSION_TOKEN", "")
 
 # --- Google Sheets ---
 SHEET_URL = os.getenv("SHEET_URL", os.getenv("GOOGLE_SHEET_URL", ""))
