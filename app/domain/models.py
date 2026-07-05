@@ -22,7 +22,7 @@ class SaidaAgente(BaseModel):
     )
     exames_baixados: int = Field(
         default=0,
-        description="Quantidade de exames baixados e enviados com sucesso.",
+        description="Quantidade de exames baixados com sucesso.",
     )
     exames_indisponiveis: List[str] = Field(
         default_factory=list,

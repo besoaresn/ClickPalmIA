@@ -33,8 +33,8 @@ STEPS
 5. For EACH target exam:
    a) Open the exam, then click "Imprimir" to open the report (it opens in a new tab).
    b) Call the tool `download_exam_report` with nome_paciente, the numeric id_paciente,
-      nome_exame AND data_exame (always include the date). The tool downloads + uploads
-      and decides skip/unavailable on its own — just read its message.
+      nome_exame AND data_exame (always include the date). The tool downloads the
+      PDF locally and decides skip/unavailable on its own — just read its message.
    c) CLOSE the report tab. Do NOT call switch_tab — focus returns to the patient tab
       automatically. Then select the next target exam.
 6. FINISH with the structured output:
@@ -47,11 +47,10 @@ RULES
 - Do NOT try to download PDFs yourself or inject scripts: always use `download_exam_report`.
 - Do NOT use the extract / extract_structured_data action: read the exam list directly
   from the page and click the cards (extract is slow and burns the token budget).
-- Once inside the portal, STAY logged in. A failed upload does NOT mean the session was
-  lost: NEVER go back to the login page, NEVER re-login, NEVER re-search the patient
-  mid-run. Just continue with the next exam.
-- Every tool answer (OK / UPLOAD_FALHOU / JA_BAIXADO / JA_PROCESSADO / IGNORADO /
-  INDISPONIVEL) means that exam is DONE — never open or download that exam again.
+- Once inside the portal, STAY logged in. NEVER go back to the login page, NEVER
+  re-login, NEVER re-search the patient mid-run. Just continue with the next exam.
+- Every tool answer (OK / JA_BAIXADO / JA_PROCESSADO / IGNORADO / INDISPONIVEL)
+  means that exam is DONE — never open or download that exam again.
 - If you see "focus target detached" / "browser not connected" / "Cannot switch tabs":
   ignore it, close the report tab if it is open, and continue with the next exam.
 - Attempt each target exam exactly ONCE. As soon as every target has been attempted,

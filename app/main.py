@@ -3,7 +3,6 @@
 Uso:  python -m app.main
 """
 import asyncio
-import os
 
 from app.core.config import (
     GEMINI_API_KEY, LLM_PROVIDER, SHEET_URL, USER, PASS,
@@ -12,20 +11,15 @@ from app.pipeline.graph import Pipeline, build_graph
 
 
 def _avisar_config() -> None:
-    """Avisa (sem abortar) sobre config faltando/placeholder — a causa comum de
-    'Invalid URL url_de_auth' (upload falha) e de login no portal não funcionar."""
+    """Avisa (sem abortar) sobre config faltando/placeholder."""
     problemas = []
     if not USER or not PASS:
         problemas.append("PORTAL_USER / PORTAL_PASS vazios (login no portal vai falhar).")
-    for var in ("CLICKPALM_LOGIN_URL", "CLICKPALM_UPLOAD_URL"):
-        val = (os.getenv(var) or "").strip()
-        if not val or not val.lower().startswith("http"):
-            problemas.append(f"{var}='{val or '(vazio)'}' não é uma URL http(s) — o upload à API vai falhar.")
     if problemas:
         print("\n⚠️  AVISO DE CONFIGURAÇÃO (.env):")
         for p in problemas:
             print(f"   - {p}")
-        print("   Os PDFs serão baixados localmente, mas o envio à API não vai funcionar.\n")
+        print("   Corrija a configuração antes de rodar o lote.\n")
 
 
 async def _run() -> None:

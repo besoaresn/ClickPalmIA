@@ -29,7 +29,7 @@ def is_relevant_exam(exam_text: str) -> bool:
 
 def texto_indica_skip(texto: str) -> bool:
     """True se o TEXTO DO LAUDO contém marcadores de carta de procedimento
-    (não é exame diagnóstico — não enviar à API)."""
+    (não é exame diagnóstico — não salvar como laudo baixado)."""
     markers = [remove_accents(m).upper() for m in EXAM_REPORT_EXCLUDE_MARKERS]
     blob = remove_accents(texto).upper()
     return any(marker in blob for marker in markers)

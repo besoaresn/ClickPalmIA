@@ -1,10 +1,10 @@
 # Extrator Agêntico de Exames (browser-use + LLM + LangGraph)
 
-Extrai laudos de mama do portal HMV e envia para a API ClickPalm. Diferente de
+Extrai laudos de mama do portal HMV e salva os PDFs localmente. Diferente de
 um RPA determinístico, aqui um **agente de IA dirige o browser** de ponta a ponta
 (navega, busca, abre exames), mas delega a parte que precisa ser **confiável** —
-capturar o PDF do laudo e enviar à API — para uma **tool determinística** portada
-do RPA maduro. Resultado: a adaptabilidade da IA + a robustez do código testado.
+capturar o PDF do laudo — para uma **tool determinística** portada do RPA maduro.
+Resultado: a adaptabilidade da IA + a robustez do código testado.
 
 ## Arquitetura
 
@@ -28,7 +28,7 @@ LangGraph (state machine)
 ## Documentação
 
 - [Fluxo do agente](docs/fluxo-agente.md): passo a passo técnico da execução,
-  da fila da planilha ao download, upload, relatórios e retomada.
+  da fila da planilha ao download local, relatórios e retomada.
 - [Quadro visual do fluxo](docs/fluxo-agente-board.svg): versão desenhada em
   formato SVG, pronta para abrir no navegador ou importar em ferramentas como Miro.
 
@@ -47,7 +47,6 @@ LangGraph (state machine)
 | `app/domain/history.py` | Histórico anti-duplicação + normalização de nomes |
 | `app/domain/models.py` | Schemas Pydantic |
 | `app/integrations/sheets.py` | Fila do Google Sheets (STATUS=1) + update de status |
-| `app/integrations/clickpalm.py` | Token + upload para a API ClickPalm |
 | `app/reporting/manager.py` | `ReportManager` (relatórios de execução e de erros) |
 | `app/core/config.py` | Env, seletores, keywords, timeouts |
 | `app/core/runstate.py` | Estado compartilhado entre grafo e tool durante um paciente |
@@ -72,10 +71,6 @@ PORTAL_PASS=...
 LLM_PROVIDER=gemini        # gemini ou bedrock
 GEMINI_API_KEY=...
 GEMINI_MODEL=gemini-3.1-flash-lite
-CLICKPALM_LOGIN_URL=...
-CLICKPALM_UPLOAD_URL=...
-CLICKPALM_CPF=...
-CLICKPALM_PASS=...
 SHEET_URL=https://docs.google.com/spreadsheets/d/SEU_ID/edit
 HEADLESS=false            # true = sem janela
 ```
@@ -125,4 +120,4 @@ pytest tests/        # filtros puros (data 2024+, keywords de mama, skip de cart
 
 Smoke ao vivo: rode com `HEADLESS=false` e 1 paciente conhecido na planilha; observe
 login → busca → abertura do laudo → `download_exam_report` salvando um PDF válido
-(`%PDF`) em `data/downloads/` → upload 200/201.
+(`%PDF`) em `data/downloads/`.

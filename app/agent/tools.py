@@ -2,12 +2,11 @@
 
 A única tool de domínio é `download_exam_report`: o agente navega/clica
 livremente (ações nativas do browser-use), mas delega a parte que precisa ser
-confiável — capturar o PDF do laudo, enviá-lo à API e CONTABILIZAR o resultado —
-para esta tool determinística, que reaproveita a lógica do RPA maduro via CDP.
+confiável — capturar o PDF do laudo e CONTABILIZAR o resultado — para esta tool
+determinística, que reaproveita a lógica do RPA maduro via CDP.
 """
 import os
 import re
-import asyncio
 from datetime import datetime
 
 from pydantic import BaseModel, Field
@@ -18,13 +17,9 @@ from app.core.config import DOWNLOAD_DIR
 from app.core.runstate import RUN
 from app.domain.history import remove_accents, read_download_history, write_download_history
 from app.domain.filters import texto_indica_skip
-from app.integrations.clickpalm import upload_to_api
 from app.agent.extraction import extract_report_pdf, read_report_text
 
 tools = Tools()
-
-# A API ClickPalm hoje usa um id de plataforma fixo (ver api_client / RPA maduro).
-ID_PLATAFORMA = "0000000000000001"
 
 _INDISPONIVEL_MARKERS = (
     "nao esta disponivel para exibicao",
@@ -63,10 +58,10 @@ def _registrar(metodo: str, **kwargs) -> None:
 
 @tools.action(
     "Captura o laudo (PDF) do exame ATUALMENTE ABERTO na aba/relatório em foco e o "
-    "envia para a API ClickPalm. Chame logo após abrir o relatório do exame (após "
-    "clicar em 'Imprimir' e a aba do relatório estar em foco). A tool decide sozinha "
-    "se deve ignorar (carta de procedimento) ou reportar indisponível — apenas leia "
-    "a mensagem retornada e siga para o próximo exame. SEMPRE informe data_exame.",
+    "salva em disco. Chame logo após abrir o relatório do exame (após clicar em "
+    "'Imprimir' e a aba do relatório estar em foco). A tool decide sozinha se deve "
+    "ignorar (carta de procedimento) ou reportar indisponível — apenas leia a "
+    "mensagem retornada e siga para o próximo exame. SEMPRE informe data_exame.",
     param_model=DownloadExameParams,
 )
 async def download_exam_report(params: DownloadExameParams, browser_session: BrowserSession) -> ActionResult:
@@ -78,10 +73,9 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
     # em datas diferentes são distintos (sem isto o 2º virava JA_BAIXADO).
     hist_id = f"{remove_accents(params.nome_paciente)}-{id_norm}-{data_norm}-{remove_accents(params.nome_exame)}".upper()
 
-    # Já TENTADO nesta execução (mesmo que o upload tenha falhado)? Não
-    # reprocessa. Sem isto, quando o upload cai (503) o agente reabre o mesmo
-    # exame em loop e a contagem infla (foi a causa de "alvos: 10" num paciente
-    # de 6). Cada alvo é tentado no máximo 1x por execução, como no RPA maduro.
+    # Já TENTADO nesta execução? Não reprocessa. Sem isto, se algo falhar depois
+    # de abrir o laudo, o agente pode reabrir o mesmo exame em loop e inflar as
+    # contagens. Cada alvo é tentado no máximo 1x por execução, como no RPA maduro.
     if RUN.ja_processou(hist_id):
         return ActionResult(extracted_content=(
             f"JA_PROCESSADO: '{params.nome_exame}' ({params.data_exame}) já foi tentado nesta "
@@ -93,12 +87,12 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
     if hist_id in read_download_history():
         RUN.marcar_processado(hist_id)
         return ActionResult(extracted_content=(
-            f"JA_BAIXADO: '{params.nome_exame}' ({params.data_exame}) já foi enviado antes. "
+            f"JA_BAIXADO: '{params.nome_exame}' ({params.data_exame}) já foi baixado antes. "
             f"Pule para o próximo exame."
         ))
 
     # Marca ANTES de processar: aconteça o que acontecer (sucesso, indisponível
-    # ou upload falho), este exame não é tentado de novo nesta execução.
+    # ou falha), este exame não é tentado de novo nesta execução.
     RUN.marcar_processado(hist_id)
     _registrar("alvo")
 
@@ -106,13 +100,13 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
     texto_norm = remove_accents(texto).lower()
 
     # Carta de procedimento (localização pré-op, "PREZADO(A) COLEGA") -> não é
-    # exame diagnóstico, não enviar.
+    # exame diagnóstico, não conta como laudo baixado.
     if texto and texto_indica_skip(texto):
         write_download_history(hist_id)
         _registrar("ignorado")
         return ActionResult(extracted_content=(
             f"IGNORADO: '{params.nome_exame}' é carta de procedimento (não diagnóstico). "
-            f"Não foi enviado. Siga para o próximo exame."
+            f"Não foi salvo como laudo. Siga para o próximo exame."
         ))
 
     if texto and any(m in texto_norm for m in _INDISPONIVEL_MARKERS):
@@ -140,20 +134,8 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
             f"relatório está aberto/focado e tente novamente, ou siga para o próximo."
         ))
 
-    # upload é requests síncrono (login + POST, até ~150s); roda em thread para
-    # não travar o event loop do browser (era a origem dos ScreenshotWatchdog
-    # >15s / "Clean screenshot timed out" / duplicate response no log).
-    ok = await asyncio.to_thread(upload_to_api, save_path, ID_PLATAFORMA, id_norm, params.nome_exame)
-    if ok:
-        write_download_history(hist_id)
-        _registrar("baixado", download_method=metodo)
-        return ActionResult(extracted_content=(
-            f"OK: '{params.nome_exame}' ({params.data_exame}) baixado [{metodo}] e enviado à API."
-        ))
-
-    _registrar("erro", nome_exame=params.nome_exame, data_exame=params.data_exame,
-               motivo=f"PDF salvo localmente ({metodo}) mas upload à API falhou.", etapa="upload_failed")
+    write_download_history(hist_id)
+    _registrar("baixado", download_method=metodo)
     return ActionResult(extracted_content=(
-        f"UPLOAD_FALHOU: PDF de '{params.nome_exame}' salvo localmente (método {metodo}), "
-        f"mas o envio à API falhou. Considere como falha e siga."
+        f"OK: '{params.nome_exame}' ({params.data_exame}) baixado [{metodo}] em {save_path}."
     ))

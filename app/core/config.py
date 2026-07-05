@@ -82,9 +82,9 @@ EXAM_EXCLUDE_KEYWORDS = [
     "PRE-OPERATORIA",
 ]
 
-# Marcadores no TEXTO DO LAUDO que indicam que NÃO é um exame diagnóstico e
-# não deve ser enviado para a API. O nome do card às vezes engana (diz "MAMO"
-# mas o laudo é uma carta de procedimento), então a checagem é feita no texto.
+# Marcadores no TEXTO DO LAUDO que indicam que NÃO é um exame diagnóstico e não
+# deve ser salvo como laudo baixado. O nome do card às vezes engana (diz "MAMO"
+# mas o conteúdo é uma carta de procedimento), então a checagem é feita no texto.
 #
 # "PREZADO(A) COLEGA": validado no portal — laudos com essa saudação são
 # cartas de encaminhamento/procedimento (localização pré-op, demarcação,
