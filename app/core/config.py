@@ -17,6 +17,7 @@ if sys.prefix != sys.base_prefix:
 
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 BASE_DIR = os.path.dirname(APP_DIR)
+PROJECT_DIR = os.path.dirname(BASE_DIR)
 DATA_DIR = os.path.abspath(os.getenv("DATA_DIR", os.path.join(BASE_DIR, "data")))
 
 # --- Execução ---
@@ -64,8 +65,19 @@ DOWNLOAD_DIR = os.path.abspath(os.getenv("DOWNLOAD_DIR", os.path.join(DATA_DIR, 
 HISTORY_FILE = os.path.abspath(os.getenv("HISTORY_FILE", os.path.join(DATA_DIR, "historico_downloads.json")))
 REPORTS_DIR = os.path.abspath(os.getenv("REPORTS_DIR", os.path.join(DATA_DIR, "reports")))
 
+# --- Métricas / telemetria ---
+METRICS_DIR = os.path.abspath(os.getenv("METRICS_DIR", os.path.join(DATA_DIR, "metricas")))
+TELEMETRY_DIR = os.path.abspath(os.getenv("TELEMETRY_DIR", os.path.join(METRICS_DIR, "telemetria")))
+METRICS_REFINED_DIR = os.path.abspath(os.getenv("METRICS_REFINED_DIR", os.path.join(METRICS_DIR, "refinado")))
+GABARITO_CSV = os.path.abspath(os.getenv("GABARITO_CSV", os.path.join(METRICS_DIR, "gabarito.csv")))
+TERMO_XLSX = os.path.abspath(os.getenv(
+    "TERMO_XLSX",
+    os.path.join(METRICS_DIR, "termo_consentimento_exames_aprovados_2024_2025.xlsx"),
+))
+
 # --- Filtros de exame ---
 EXAM_YEAR_CUTOFF = 2024
+EXAM_YEAR_MAX = 2025
 
 # Palavras-chave que marcam o exame como alvo (mama).
 EXAM_TARGET_KEYWORDS = [

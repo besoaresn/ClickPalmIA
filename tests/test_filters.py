@@ -10,6 +10,7 @@ from app.domain.filters import check_exam_date, is_relevant_exam, texto_indica_s
 def test_check_exam_date_corte_2024():
     assert check_exam_date("15/03/2024 10:30") is True
     assert check_exam_date("01/01/2025") is True
+    assert check_exam_date("01/01/2026") is False
     assert check_exam_date("31/12/2023 09:00") is False
     assert check_exam_date("data oculta") is False
     assert check_exam_date("") is False

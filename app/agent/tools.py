@@ -54,6 +54,23 @@ def _registrar(metodo: str, **kwargs) -> None:
             data_exame=kwargs.get("data_exame", ""), nome_exame=kwargs.get("nome_exame", ""),
             motivo=kwargs.get("motivo", ""), etapa=kwargs.get("etapa", "erro"),
         )
+    elif metodo == "exame":
+        rep.registrar_exame_visto(
+            paciente=pac,
+            cpf=RUN.cpf,
+            data_exame=kwargs.get("data_exame", ""),
+            nome_exame=kwargs.get("nome_exame", ""),
+            decisao=kwargs.get("decisao", ""),
+            metodo=kwargs.get("download_method"),
+        )
+    elif metodo == "decisao_exame":
+        rep.atualizar_decisao_exame(
+            paciente=pac,
+            data_exame=kwargs.get("data_exame", ""),
+            nome_exame=kwargs.get("nome_exame", ""),
+            decisao=kwargs.get("decisao", ""),
+            metodo=kwargs.get("download_method"),
+        )
 
 
 @tools.action(
@@ -86,6 +103,12 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
     # Já baixado em execução anterior (histórico persistente entre runs).
     if hist_id in read_download_history():
         RUN.marcar_processado(hist_id)
+        _registrar(
+            "exame",
+            nome_exame=params.nome_exame,
+            data_exame=params.data_exame,
+            decisao="ja_no_historico",
+        )
         return ActionResult(extracted_content=(
             f"JA_BAIXADO: '{params.nome_exame}' ({params.data_exame}) já foi baixado antes. "
             f"Pule para o próximo exame."
@@ -95,6 +118,12 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
     # ou falha), este exame não é tentado de novo nesta execução.
     RUN.marcar_processado(hist_id)
     _registrar("alvo")
+    _registrar(
+        "exame",
+        nome_exame=params.nome_exame,
+        data_exame=params.data_exame,
+        decisao="alvo",
+    )
 
     texto = await read_report_text(cdp_session)
     texto_norm = remove_accents(texto).lower()
@@ -104,6 +133,12 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
     if texto and texto_indica_skip(texto):
         write_download_history(hist_id)
         _registrar("ignorado")
+        _registrar(
+            "decisao_exame",
+            nome_exame=params.nome_exame,
+            data_exame=params.data_exame,
+            decisao="ignorado_marcador",
+        )
         return ActionResult(extracted_content=(
             f"IGNORADO: '{params.nome_exame}' é carta de procedimento (não diagnóstico). "
             f"Não foi salvo como laudo. Siga para o próximo exame."
@@ -112,6 +147,12 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
     if texto and any(m in texto_norm for m in _INDISPONIVEL_MARKERS):
         _registrar("erro", nome_exame=params.nome_exame, data_exame=params.data_exame,
                    motivo="Portal informou laudo indisponível para exibição.", etapa="relatorio_indisponivel")
+        _registrar(
+            "decisao_exame",
+            nome_exame=params.nome_exame,
+            data_exame=params.data_exame,
+            decisao="relatorio_indisponivel",
+        )
         return ActionResult(extracted_content=(
             f"INDISPONIVEL: o portal informou que o laudo de '{params.nome_exame}' não está "
             f"disponível para exibição. Registre como indisponível e siga para o próximo."
@@ -129,6 +170,12 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
     if not metodo:
         _registrar("erro", nome_exame=params.nome_exame, data_exame=params.data_exame,
                    motivo="Não foi possível extrair o PDF do portal.", etapa="extract_pdf_failed")
+        _registrar(
+            "decisao_exame",
+            nome_exame=params.nome_exame,
+            data_exame=params.data_exame,
+            decisao="falha_extracao",
+        )
         return ActionResult(extracted_content=(
             f"FALHA: não consegui extrair o PDF de '{params.nome_exame}'. Confirme que o "
             f"relatório está aberto/focado e tente novamente, ou siga para o próximo."
@@ -136,6 +183,13 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
 
     write_download_history(hist_id)
     _registrar("baixado", download_method=metodo)
+    _registrar(
+        "decisao_exame",
+        nome_exame=params.nome_exame,
+        data_exame=params.data_exame,
+        decisao="baixado",
+        download_method=metodo,
+    )
     return ActionResult(extracted_content=(
         f"OK: '{params.nome_exame}' ({params.data_exame}) baixado [{metodo}] em {save_path}."
     ))

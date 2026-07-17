@@ -6,6 +6,7 @@ Resumo/idempotência vêm do STATUS da planilha: paciente concluído sai da fila
 (STATUS->0), então re-executar o lote retoma de onde parou.
 """
 import asyncio
+import time
 from typing import TypedDict
 
 from langgraph.graph import StateGraph, START, END
@@ -56,12 +57,20 @@ class Pipeline:
         print(f"[{i + 1}/{len(state['pacientes'])}] Processando: {pac.nome}")
         # A tool escreve as contagens diretamente no ReportManager deste paciente.
         RUN.bind(self.report, pac.nome, pac.cpf)
+        inicio_paciente = time.perf_counter()
         try:
             saida = await run_patient(self.browser, self.llm, pac, fallback_llm=self.fallback_llm)
+            self.report.registrar_login(True)
+            self.report.registrar_busca(pac.nome, not saida.nao_encontrado)
             self._persist(pac, saida, erro="")
         except Exception as e:
             print(f"ERRO no paciente {pac.nome}: {e}")
+            if self.report.login_ok is None:
+                self.report.registrar_login(False)
+            self.report.registrar_busca(pac.nome, False)
             self._persist(pac, SaidaAgente(), erro=str(e))
+        finally:
+            self.report.registrar_tempo_paciente(pac.nome, time.perf_counter() - inicio_paciente)
         return {"idx": i + 1}
 
     async def finalize(self, state: PipelineState) -> PipelineState:
@@ -88,10 +97,12 @@ class Pipeline:
 
         try:
             path_erros = self.report.salvar_erros()
+            path_telemetria = self.report.salvar_telemetria()
             path_final, conteudo = self.report.gerar_relatorio_final()
             print("\n" + conteudo)
             print(f"Relatório final: {path_final}")
             print(f"Relatório de erros: {path_erros}")
+            print(f"Telemetria de métricas: {path_telemetria}")
         except Exception as e:
             print(f"ERRO ao gerar relatórios: {e}")
 
@@ -110,6 +121,7 @@ class Pipeline:
                 paciente=nome, cpf=cpf, data_exame="", nome_exame="",
                 motivo=f"Exceção na sessão do agente: {erro}", etapa="patient_session_crash",
             )
+            self.report.registrar_download_completo(nome, False)
             return
 
         if saida.nao_encontrado:
@@ -120,12 +132,14 @@ class Pipeline:
             )
             update_sheet_status(SHEET_URL, row, 0)  # sai da fila, como no RPA maduro
             self.report.registrar_paciente_processado()
+            self.report.registrar_download_completo(nome, False)
             return
 
         # As contagens (alvos/baixados/ignorados/indisponíveis/falhas) já foram
         # gravadas pela tool download_exam_report (fonte de verdade). Aqui só
         # decidimos o STATUS da planilha a partir das falhas reais registradas.
         falhas = self.report.por_paciente.get(nome, {}).get("falhas", 0)
+        self.report.registrar_download_completo(nome, falhas == 0)
         if falhas == 0:
             # Sucesso pleno -> sai da fila. Com falhas/indisponíveis, mantém
             # STATUS=1 para reprocessar depois.

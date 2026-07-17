@@ -1,6 +1,7 @@
 """Filtros puros de exame — sem dependência de browser, unit-testáveis."""
 from app.core.config import (
     EXAM_YEAR_CUTOFF,
+    EXAM_YEAR_MAX,
     EXAM_TARGET_KEYWORDS,
     EXAM_EXCLUDE_KEYWORDS,
     EXAM_REPORT_EXCLUDE_MARKERS,
@@ -9,11 +10,11 @@ from app.domain.history import remove_accents
 
 
 def check_exam_date(date_str: str) -> bool:
-    """True se o ano do exame for >= EXAM_YEAR_CUTOFF. Formato esperado:
+    """True se o ano do exame estiver na janela configurada. Formato esperado:
     'DD/MM/YYYY ...' (hora opcional)."""
     try:
         ano = int(date_str.split(" ")[0].split("/")[2])
-        return ano >= EXAM_YEAR_CUTOFF
+        return EXAM_YEAR_CUTOFF <= ano <= EXAM_YEAR_MAX
     except (ValueError, IndexError, AttributeError):
         return False
 

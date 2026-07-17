@@ -3,7 +3,7 @@ import json
 import time
 from datetime import datetime
 
-from app.core.config import REPORTS_DIR
+from app.core.config import REPORTS_DIR, TELEMETRY_DIR
 
 
 class ReportManager:
@@ -20,12 +20,66 @@ class ReportManager:
         self.metodos_download = {}
         self.pacientes_processados = 0
         self.pacientes_nao_encontrados = 0
+        self.run_id = self.timestamp.strftime("%d-%m-%Y_%H%M%S")
+        self.login_ok = None
+        self.exames_eventos = []
         os.makedirs(REPORTS_DIR, exist_ok=True)
 
     def _slot(self, paciente):
         if paciente not in self.por_paciente:
-            self.por_paciente[paciente] = {"alvos": 0, "baixados": 0, "falhas": 0, "ignorados": 0}
+            self.por_paciente[paciente] = {
+                "alvos": 0,
+                "baixados": 0,
+                "falhas": 0,
+                "ignorados": 0,
+                "busca_ok": None,
+                "download_completo_ok": None,
+                "tempo_s": None,
+            }
         return self.por_paciente[paciente]
+
+    # [MÉTRICAS] Captura bruta consumida por calcular_metricas.py.
+    def registrar_login(self, ok: bool):
+        self.login_ok = bool(ok)
+
+    def registrar_busca(self, paciente, encontrado: bool):
+        self._slot(paciente)["busca_ok"] = bool(encontrado)
+
+    def registrar_download_completo(self, paciente, ok: bool):
+        self._slot(paciente)["download_completo_ok"] = bool(ok)
+
+    def registrar_tempo_paciente(self, paciente, segundos: float):
+        self._slot(paciente)["tempo_s"] = round(float(segundos), 2)
+
+    def registrar_exame_visto(self, *, paciente, cpf, data_exame, nome_exame, decisao, metodo=None):
+        self.exames_eventos.append({
+            "paciente": paciente,
+            "cpf": cpf,
+            "data_exame": data_exame,
+            "nome_exame": nome_exame,
+            "decisao": decisao,
+            "metodo": metodo,
+        })
+
+    def atualizar_decisao_exame(self, *, paciente, data_exame, nome_exame, decisao, metodo=None):
+        for ev in reversed(self.exames_eventos):
+            if (
+                ev["paciente"] == paciente
+                and ev["data_exame"] == data_exame
+                and ev["nome_exame"] == nome_exame
+            ):
+                ev["decisao"] = decisao
+                if metodo is not None:
+                    ev["metodo"] = metodo
+                return
+        self.registrar_exame_visto(
+            paciente=paciente,
+            cpf="",
+            data_exame=data_exame,
+            nome_exame=nome_exame,
+            decisao=decisao,
+            metodo=metodo,
+        )
 
     def registrar_alvos(self, paciente, n):
         self._slot(paciente)["alvos"] += n
@@ -80,6 +134,26 @@ class ReportManager:
             "total_erros": len(self.erros),
             "erros": self.erros,
         }
+        with open(path, 'w', encoding='utf-8') as f:
+            json.dump(payload, f, indent=4, ensure_ascii=False)
+        return path
+
+    def salvar_telemetria(self):
+        self._finalizar_timer()
+        os.makedirs(TELEMETRY_DIR, exist_ok=True)
+        payload = {
+            "run_id": self.run_id,
+            "inicio": self.timestamp.isoformat(),
+            "duracao_s": round(self._end - self._start, 3),
+            "login_ok": self.login_ok,
+            "pacientes_processados": self.pacientes_processados,
+            "pacientes_nao_encontrados": self.pacientes_nao_encontrados,
+            "total_erros": len(self.erros),
+            "erros": self.erros,
+            "por_paciente": self.por_paciente,
+            "exames": self.exames_eventos,
+        }
+        path = os.path.join(TELEMETRY_DIR, f"run_{self.run_id}.json")
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(payload, f, indent=4, ensure_ascii=False)
         return path

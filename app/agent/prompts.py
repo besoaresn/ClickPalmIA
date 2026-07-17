@@ -1,6 +1,6 @@
 """Prompt da tarefa do agente, por paciente. Enxuto e em inglês (o modelo
 performa melhor); a parte difícil fica nas tools e nas ações nativas."""
-from app.core.config import SITE_URL, USER, PASS, EXAM_YEAR_CUTOFF, EXAM_TARGET_KEYWORDS
+from app.core.config import SITE_URL, USER, PASS, EXAM_YEAR_CUTOFF, EXAM_YEAR_MAX, EXAM_TARGET_KEYWORDS
 from app.domain.history import remove_accents
 
 _KEYWORDS = ", ".join(EXAM_TARGET_KEYWORDS)
@@ -26,7 +26,7 @@ STEPS
 2. FIND PATIENT (max 3 tries): search "{nome_norm}" (full name); if nothing matches,
    try the FIRST NAME only. If still not found, finish with nao_encontrado=true.
 3. OPEN the patient record and READ the numeric patient ID (digits only). Keep it.
-4. LIST EXAMS and select the targets: exams from year {EXAM_YEAR_CUTOFF} onward whose
+4. LIST EXAMS and select the targets: exams from years {EXAM_YEAR_CUTOFF}-{EXAM_YEAR_MAX} whose
    name matches breast keywords ({_KEYWORDS}). Only SKIP cards explicitly marked
    "apenas imagens"; cards marked "somente registro"/"somente resultado" ARE targets.
    Make ONE list of the distinct target exams up front and process each exam ONCE.

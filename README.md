@@ -112,10 +112,28 @@ gera `data/reports/execucao_*.txt` e `data/reports/erros_*.json`. PDFs ficam em
 `data/downloads/`. Paciente concluído tem `STATUS` zerado na planilha — re-rodar
 retoma de onde parou.
 
+## Métricas
+
+A execução também grava telemetria bruta em `data/metricas/telemetria/run_*.json`.
+Para gerar os CSVs usados no artigo:
+
+```bash
+python calcular_metricas.py --gerar-gabarito
+# revise data/metricas/gabarito.csv, coluna autorizado (1/0)
+python calcular_metricas.py --validar-gabarito
+python calcular_metricas.py
+```
+
+O refinador gera `data/metricas/refinado/geral.csv` e
+`data/metricas/refinado/detalhado_<run_id>.csv` com Bloco 1
+(VP/FP/FN/VN, acurácia, precisão, revocação e F1) e Bloco 3
+(login, busca, download unitário e download completo), usando a janela
+2024-2025.
+
 ## Testes
 
 ```bash
-pytest tests/        # filtros puros (data 2024+, keywords de mama, skip de carta)
+pytest tests/        # filtros puros (janela 2024-2025, keywords de mama, skip de carta)
 ```
 
 Smoke ao vivo: rode com `HEADLESS=false` e 1 paciente conhecido na planilha; observe
