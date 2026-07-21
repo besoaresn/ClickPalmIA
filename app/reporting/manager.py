@@ -3,7 +3,11 @@ import json
 import time
 from datetime import datetime
 
-from app.core.config import REPORTS_DIR, TELEMETRY_DIR
+from app.core.config import (
+    INFRA_CUSTO_MEMORIA_GB_HORA, INFRA_CUSTO_VCPU_HORA, INFRA_MEMORIA_GB,
+    INFRA_VCPU, LLM_PRECO_MILHAO_ENTRADA, LLM_PRECO_MILHAO_SAIDA,
+    REPORTS_DIR, TELEMETRY_DIR,
+)
 
 
 class ReportManager:
@@ -23,6 +27,8 @@ class ReportManager:
         self.run_id = self.timestamp.strftime("%d-%m-%Y_%H%M%S")
         self.login_ok = None
         self.exames_eventos = []
+        self.llm_tokens_entrada = 0
+        self.llm_tokens_saida = 0
         os.makedirs(REPORTS_DIR, exist_ok=True)
 
     def _slot(self, paciente):
@@ -80,6 +86,10 @@ class ReportManager:
             decisao=decisao,
             metodo=metodo,
         )
+
+    def registrar_tokens_llm(self, tokens_entrada: int, tokens_saida: int):
+        self.llm_tokens_entrada += int(tokens_entrada or 0)
+        self.llm_tokens_saida += int(tokens_saida or 0)
 
     def registrar_alvos(self, paciente, n):
         self._slot(paciente)["alvos"] += n
@@ -141,10 +151,11 @@ class ReportManager:
     def salvar_telemetria(self):
         self._finalizar_timer()
         os.makedirs(TELEMETRY_DIR, exist_ok=True)
+        duracao_s = round(self._end - self._start, 3)
         payload = {
             "run_id": self.run_id,
             "inicio": self.timestamp.isoformat(),
-            "duracao_s": round(self._end - self._start, 3),
+            "duracao_s": duracao_s,
             "login_ok": self.login_ok,
             "pacientes_processados": self.pacientes_processados,
             "pacientes_nao_encontrados": self.pacientes_nao_encontrados,
@@ -152,7 +163,23 @@ class ReportManager:
             "erros": self.erros,
             "por_paciente": self.por_paciente,
             "exames": self.exames_eventos,
+            # [MÉTRICAS] Custo de infra (Fargate) e de LLM — ver
+            # docs/Deploy_AWS_Metricas_Custo_RPA_vs_APA.docx, seções 2-4.
+            "infra": {
+                "vcpu": INFRA_VCPU,
+                "memoria_gb": INFRA_MEMORIA_GB,
+                "duracao_s": duracao_s,
+                "custo_vcpu_hora": INFRA_CUSTO_VCPU_HORA,
+                "custo_memoria_gb_hora": INFRA_CUSTO_MEMORIA_GB_HORA,
+            },
         }
+        if self.llm_tokens_entrada or self.llm_tokens_saida:
+            payload["llm"] = {
+                "tokens_entrada": self.llm_tokens_entrada,
+                "tokens_saida": self.llm_tokens_saida,
+                "preco_por_milhao_entrada": LLM_PRECO_MILHAO_ENTRADA,
+                "preco_por_milhao_saida": LLM_PRECO_MILHAO_SAIDA,
+            }
         path = os.path.join(TELEMETRY_DIR, f"run_{self.run_id}.json")
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(payload, f, indent=4, ensure_ascii=False)

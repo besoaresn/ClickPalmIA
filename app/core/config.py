@@ -108,6 +108,19 @@ EXAM_REPORT_EXCLUDE_MARKERS = [
     "PREZADO(A) COLEGA",
 ]
 
+# --- Custo (infra Fargate + LLM), ver docs/Deploy_AWS_Metricas_Custo_RPA_vs_APA.docx ---
+# Tamanho da Task ECS Fargate desta execução (mesmo valor para RPA e APA na comparação).
+INFRA_VCPU = float(os.getenv("INFRA_VCPU", "1.0"))
+INFRA_MEMORIA_GB = float(os.getenv("INFRA_MEMORIA_GB", "2.0"))
+# Preços Fargate (US East, por hora). Ajustar se mudar de região.
+INFRA_CUSTO_VCPU_HORA = float(os.getenv("INFRA_CUSTO_VCPU_HORA", "0.04048"))
+INFRA_CUSTO_MEMORIA_GB_HORA = float(os.getenv("INFRA_CUSTO_MEMORIA_GB_HORA", "0.004445"))
+# Preço do LLM usado pelo agente (Gemini ou Bedrock/Claude), por milhão de tokens.
+# Default reflete Claude Haiku 4.5 via Bedrock (BEDROCK_MODEL acima), confirmado no
+# rate card real da conta (us-east-1); ajustar se trocar de modelo.
+LLM_PRECO_MILHAO_ENTRADA = float(os.getenv("LLM_PRECO_MILHAO_ENTRADA", "1.1"))
+LLM_PRECO_MILHAO_SAIDA = float(os.getenv("LLM_PRECO_MILHAO_SAIDA", "5.5"))
+
 # --- Timeouts ---
 SEARCH_TIMEOUT = 10.0            # teto (s) para localizar o paciente na tabela
 SEARCH_NOT_FOUND_GRACE = 2.0     # tempo (s) antes de confiar no badge "(0)" = sem resultado

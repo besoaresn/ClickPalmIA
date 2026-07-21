@@ -20,6 +20,7 @@ from app.core.config import (
 from app.domain.models import Paciente, SaidaAgente
 from app.agent.prompts import build_task
 from app.agent.tools import tools
+from app.reporting import ReportManager
 
 MAX_STEPS = 60
 NON_RETRYABLE_BEDROCK_MESSAGES = (
@@ -195,7 +196,8 @@ def build_browser() -> Browser:
 
 
 async def run_patient(browser: Browser, llm: BaseChatModel, paciente: Paciente,
-                      fallback_llm: BaseChatModel | None = None) -> SaidaAgente:
+                      fallback_llm: BaseChatModel | None = None,
+                      report: ReportManager | None = None) -> SaidaAgente:
     task = build_task(paciente.nome, paciente.cpf)
     agent = Agent(
         task=task,
@@ -208,5 +210,12 @@ async def run_patient(browser: Browser, llm: BaseChatModel, paciente: Paciente,
         directly_open_url=False,
     )
     history = await agent.run(max_steps=MAX_STEPS)
+    # [MÉTRICAS] Custo de LLM por execução — ver
+    # docs/Deploy_AWS_Metricas_Custo_RPA_vs_APA.docx, seção 3.
+    if report is not None and history.usage is not None:
+        report.registrar_tokens_llm(
+            history.usage.total_prompt_tokens,
+            history.usage.total_completion_tokens,
+        )
     saida = history.structured_output
     return saida if isinstance(saida, SaidaAgente) else SaidaAgente()

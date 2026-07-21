@@ -59,7 +59,8 @@ class Pipeline:
         RUN.bind(self.report, pac.nome, pac.cpf)
         inicio_paciente = time.perf_counter()
         try:
-            saida = await run_patient(self.browser, self.llm, pac, fallback_llm=self.fallback_llm)
+            saida = await run_patient(self.browser, self.llm, pac,
+                                       fallback_llm=self.fallback_llm, report=self.report)
             self.report.registrar_login(True)
             self.report.registrar_busca(pac.nome, not saida.nao_encontrado)
             self._persist(pac, saida, erro="")
