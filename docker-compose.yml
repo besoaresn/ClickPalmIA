@@ -1,0 +1,15 @@
+services:
+  apa-exames:
+    build: .
+    image: apa-exames:latest
+    restart: "no"
+    env_file:
+      - .env
+    environment:
+      - DATA_DIR=/data
+      - DOCKER_CONTAINER=true
+      - HEADLESS=true
+      - CREDENTIALS_FILE=/app/credenciais.json
+    volumes:
+      - ./data:/data
+      - ./credenciais.json:/app/credenciais.json:ro

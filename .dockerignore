@@ -1,0 +1,22 @@
+.venv/
+.idea/
+.git/
+.pytest_cache/
+__pycache__/
+*.pyc
+
+# Segredos — nunca vão pra imagem (Secrets Manager/SSM na AWS, ver docs/)
+.env
+.env.*
+!.env.example
+credenciais.json
+
+# Dados em runtime — persistem via volume/EFS, não fazem parte da imagem
+data/
+downloads/
+reports/
+
+docs/
+tests/
+README.md
+run.sh
