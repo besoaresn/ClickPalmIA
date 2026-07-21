@@ -79,8 +79,8 @@ Para usar Claude via AWS Bedrock, troque o bloco de LLM:
 
 ```env
 LLM_PROVIDER=bedrock
-BEDROCK_MODEL=us.anthropic.claude-opus-4-6-v1
-BEDROCK_FALLBACK_MODEL=us.anthropic.claude-sonnet-4-6
+BEDROCK_MODEL=us.anthropic.claude-haiku-4-5-20251001-v1:0
+BEDROCK_FALLBACK_MODEL=us.anthropic.claude-haiku-4-5-20251001-v1:0
 BEDROCK_MAX_TOKENS=8192
 BEDROCK_RETRY_ATTEMPTS=3
 BEDROCK_AUTH_MODE=default
@@ -92,10 +92,12 @@ AWS_SECRET_ACCESS_KEY=
 AWS_SESSION_TOKEN=        # preencher só se a credencial IAM/STS for temporária
 ```
 
-O prefixo `us.` é o inference profile indicado pela AWS para usar o Opus 4.6
-nas regiões dos EUA, como `us-east-1`.
-O fallback usa Sonnet 4.6 para evitar que uma falha transitória `502/503` do
-Opus derrube o lote inteiro.
+O prefixo `us.` é o inference profile exigido pela AWS para invocar o Claude
+Haiku 4.5 (e demais modelos Claude recentes) nas regiões dos EUA, como
+`us-east-1` — o modelo não aceita invocação direta on-demand sem esse profile.
+Custo: ~$1,10/milhão de tokens de entrada e ~$5,50/milhão de saída (rate card
+AWS Bedrock, `us-east-1`). Ver `docs/bedrock-deploy/` para os scripts de deploy
+e o passo a passo de liberação de acesso ao Bedrock numa conta nova.
 Com `BEDROCK_AUTH_MODE=default`, o boto3 pode usar chaves no `.env`, perfil/SSO
 da AWS, role da máquina ou token/API key suportado pela configuração AWS local.
 Não coloque a API key do Bedrock em `AWS_ACCESS_KEY_ID`; ela deve ir em
