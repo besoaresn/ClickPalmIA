@@ -2,6 +2,11 @@
 browser-use[aws]==0.12.9
 uv==0.11.23
 
+# Requerido pelo provider de credenciais "bearer token" do botocore quando
+# autenticando no Bedrock via Bedrock API key (AWS_BEARER_TOKEN_BEDROCK).
+# Sem isso: MissingDependencyException ao chamar bedrock-runtime.
+awscrt==0.31.2
+
 # Orquestração (state machine, loop por paciente)
 langgraph==1.2.4
 
