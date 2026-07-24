@@ -1,27 +1,32 @@
 #!/usr/bin/env bash
-# Registra uma nova revisão de clickpalmia-apa apontando para Bedrock/Claude.
+# Registra uma nova revisão de $ECS_TASK_FAMILY apontando para Bedrock/Claude.
 # Roda no SEU terminal (precisa de `aws configure` / sessão válida). Requer `jq`.
 #
 # O que faz:
-#   1. Baixa a task definition ativa (clickpalmia-apa:2, ou a revisão passada em $1)
+#   1. Baixa a task definition ativa ($ECS_TASK_FAMILY:$CURRENT_REVISION)
 #   2. Sobrescreve/insere as env vars de LLM_PROVIDER=bedrock
 #   3. Registra a nova revisão
 #   4. Imprime o comando pra rodar essa revisão com `ecs run-task`
 #
 # Não roda nada destrutivo sozinho — a revisão antiga continua existindo,
 # então dá pra voltar pra ela se algo der errado.
+#
+# Requer um "docs/bedrock-deploy/deploy.env" (gitignored, com os IDs reais da
+# conta) — copie deploy.env.example e preencha antes de rodar.
 
 set -euo pipefail
 
-REGION="us-east-1"
-FAMILY="clickpalmia-apa"
-CURRENT_REVISION="${1:-3}"   # ajuste se a revisão em produção não for mais a :3
-ROLE_NAME="clickpalmia-apa-task-role"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=deploy.env
+source "${SCRIPT_DIR}/deploy.env"
 
-echo "== 1. Baixando task definition ${FAMILY}:${CURRENT_REVISION} =="
+CURRENT_REVISION="${1:-3}"   # ajuste se a revisão em produção não for mais a :3
+ROLE_NAME="${TASK_ROLE_NAME}"
+
+echo "== 1. Baixando task definition ${ECS_TASK_FAMILY}:${CURRENT_REVISION} =="
 aws ecs describe-task-definition \
-  --task-definition "${FAMILY}:${CURRENT_REVISION}" \
-  --region "$REGION" \
+  --task-definition "${ECS_TASK_FAMILY}:${CURRENT_REVISION}" \
+  --region "$AWS_REGION" \
   --query "taskDefinition" > /tmp/current-task-def.json
 
 echo "== 2. Aplicando env vars de Bedrock =="
@@ -36,7 +41,7 @@ jq '
       {"name": "LLM_PROVIDER", "value": "bedrock"},
       {"name": "BEDROCK_MODEL", "value": "us.anthropic.claude-haiku-4-5-20251001-v1:0"},
       {"name": "BEDROCK_FALLBACK_MODEL", "value": "us.anthropic.claude-haiku-4-5-20251001-v1:0"},
-      {"name": "AWS_REGION", "value": "us-east-1"},
+      {"name": "AWS_REGION", "value": "'"${AWS_REGION}"'"},
       {"name": "BEDROCK_AUTH_MODE", "value": "default"}
     ])
   # register-task-definition não aceita estes campos de volta:
@@ -47,7 +52,7 @@ jq '
 echo "== 3. Registrando nova revisão =="
 NEW_ARN=$(aws ecs register-task-definition \
   --cli-input-json file:///tmp/new-task-def.json \
-  --region "$REGION" \
+  --region "$AWS_REGION" \
   --query "taskDefinition.taskDefinitionArn" \
   --output text)
 
@@ -57,12 +62,13 @@ echo "== 4. Adicionando permissão de Bedrock na Task Role =="
 aws iam put-role-policy \
   --role-name "$ROLE_NAME" \
   --policy-name bedrock-invoke-claude \
-  --policy-document file://bedrock-invoke-policy.json
+  --policy-document "file://${SCRIPT_DIR}/bedrock-invoke-policy.json" \
+  --region "$AWS_REGION"
 
 echo
 echo "Pronto. Para rodar essa revisão:"
-echo "aws ecs run-task --cluster clickpalmia-cluster \\"
+echo "aws ecs run-task --cluster ${ECS_CLUSTER} \\"
 echo "  --task-definition ${NEW_ARN##*/} \\"
 echo "  --launch-type FARGATE \\"
-echo "  --network-configuration \"awsvpcConfiguration={subnets=[subnet-08a235d2e57ee59f8],securityGroups=[sg-028d8d6bc1293f41d],assignPublicIp=ENABLED}\" \\"
-echo "  --region us-east-1"
+echo "  --network-configuration \"awsvpcConfiguration={subnets=[${SUBNET_ID_A}],securityGroups=[${SECURITY_GROUP_ID}],assignPublicIp=ENABLED}\" \\"
+echo "  --region ${AWS_REGION}"

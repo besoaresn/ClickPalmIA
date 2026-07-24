@@ -10,7 +10,7 @@ Categoria sugerida: **Service Limit Increase** (se não tiver Bedrock na lista, 
 
 **Descrição:**
 
-Minha conta AWS (ID 857145323577) consegue usar modelos Anthropic Claude no
+Minha conta AWS (ID <AWS_ACCOUNT_ID> — ver `docs/bedrock-deploy/deploy.env`) consegue usar modelos Anthropic Claude no
 Bedrock Playground (console) normalmente — testei o Claude Haiku 4.5 na região
 us-east-1 e funcionou.
 
