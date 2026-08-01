@@ -22,12 +22,23 @@ etc. — carregue com `source docs/bedrock-deploy/deploy.env`).
 | Execution Role | `$EXECUTION_ROLE_NAME` (pull da imagem + leitura dos secrets) |
 | Task Role | `$TASK_ROLE_NAME` (permissões extras pontuais, ex. ECS Exec, Bedrock) |
 | EFS (dados persistentes) | `$EFS_ID`, access point `$EFS_ACCESS_POINT_ID` → montado em `/data` |
-| Secrets Manager | `clickpalmia-apa/PORTAL_USER`, `clickpalmia-apa/PORTAL_PASS`, `clickpalmia-apa/GEMINI_API_KEY` |
+| Secrets Manager | `clickpalmia-apa/PORTAL_USER`, `clickpalmia-apa/PORTAL_PASS`, `clickpalmia-apa/GEMINI_API_KEY`, `clickpalmia-apa/GEMINI_FALLBACK_API_KEY` |
 | Log group | `$LOG_GROUP` |
 | VPC / Subnets / SG | `$VPC_ID` / `$SUBNET_ID_A` (us-east-1a), `$SUBNET_ID_B` (us-east-1b) / `$SECURITY_GROUP_ID` |
 
-`/data` no EFS contém: `downloads/` (PDFs), `historico_downloads.json` (anti-duplicação),
-`metricas/` (telemetria, gabarito, refinado), `reports/` (execução/erros) e `credenciais.json`.
+Com `RESULTS_S3_URI`, a task publica somente telemetria e relatórios no bucket
+privado. PDFs de laudo permanecem no EFS, pois contêm dados de paciente. O
+`credenciais.json` continua fora do S3, montado como arquivo somente leitura.
+
+Exemplo de variáveis na task definition:
+
+```text
+RESULTS_S3_URI=s3://clickpalmia-metricas-857145323577/apa
+DATA_DIR=/tmp/clickpalmia
+```
+
+A Task Role precisa permitir `s3:GetObject`, `s3:PutObject` e `s3:ListBucket`
+somente no bucket/prefixo usados pelos resultados.
 
 Preço do LLM configurado na task definition (Gemini 3.1 Flash-Lite, tier padrão):
 `LLM_PRECO_MILHAO_ENTRADA=0.25`, `LLM_PRECO_MILHAO_SAIDA=1.50` (USD/milhão de tokens).
@@ -97,6 +108,7 @@ Rodar sempre no seu terminal local — nunca colar valores reais no chat:
 aws secretsmanager put-secret-value --secret-id clickpalmia-apa/PORTAL_USER --secret-string "SEU_LOGIN"
 aws secretsmanager put-secret-value --secret-id clickpalmia-apa/PORTAL_PASS --secret-string "SUA_SENHA"
 aws secretsmanager put-secret-value --secret-id clickpalmia-apa/GEMINI_API_KEY --secret-string "SUA_GEMINI_API_KEY"
+aws secretsmanager put-secret-value --secret-id clickpalmia-apa/GEMINI_FALLBACK_API_KEY --secret-string "SUA_GEMINI_FALLBACK_API_KEY"
 ```
 
 ## 4. Acessar o EFS (dados persistentes) via ECS Exec

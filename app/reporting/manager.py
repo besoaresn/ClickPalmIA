@@ -8,6 +8,7 @@ from app.core.config import (
     INFRA_VCPU, LLM_PRECO_MILHAO_ENTRADA, LLM_PRECO_MILHAO_SAIDA,
     REPORTS_DIR, TELEMETRY_DIR,
 )
+from app.integrations.storage import get_storage
 
 
 class ReportManager:
@@ -146,6 +147,7 @@ class ReportManager:
         }
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(payload, f, indent=4, ensure_ascii=False)
+        get_storage().upload_result_artifact(path, "reports")
         return path
 
     def salvar_telemetria(self):
@@ -183,6 +185,7 @@ class ReportManager:
         path = os.path.join(TELEMETRY_DIR, f"run_{self.run_id}.json")
         with open(path, 'w', encoding='utf-8') as f:
             json.dump(payload, f, indent=4, ensure_ascii=False)
+        get_storage().upload_result_artifact(path, "telemetria")
         return path
 
     def gerar_relatorio_final(self):
@@ -222,4 +225,5 @@ class ReportManager:
         conteudo = "\n".join(linhas) + "\n"
         with open(path, 'w', encoding='utf-8') as f:
             f.write(conteudo)
+        get_storage().upload_result_artifact(path, "reports")
         return path, conteudo

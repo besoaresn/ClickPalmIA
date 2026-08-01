@@ -14,7 +14,7 @@ from app.core.config import (
     AWS_ACCESS_KEY_ID, AWS_REGION, AWS_SECRET_ACCESS_KEY, AWS_SESSION_TOKEN,
     BEDROCK_API_KEY, BEDROCK_AUTH_MODE, BEDROCK_FALLBACK_MODEL,
     BEDROCK_MAX_TOKENS, BEDROCK_MODEL, BEDROCK_RETRY_ATTEMPTS, GEMINI_API_KEY,
-    GEMINI_FALLBACK_MODEL, GEMINI_MODEL, HEADLESS_MODE,
+    GEMINI_FALLBACK_API_KEY, GEMINI_FALLBACK_MODEL, GEMINI_MODEL, HEADLESS_MODE,
     DOWNLOAD_DIR, LLM_PROVIDER,
 )
 from app.domain.models import Paciente, SaidaAgente
@@ -124,7 +124,7 @@ def _configure_bedrock_credentials() -> dict:
     return kwargs
 
 
-def _make_gemini_llm(model: str) -> ChatGoogle:
+def _make_gemini_llm(model: str, api_key: str) -> ChatGoogle:
     """ChatGoogle com thinking contido e orçamento de saída folgado.
 
     Sem isto o flash-lite (Gemini 3) usa thinking dinâmico (~8k tokens) com
@@ -137,15 +137,77 @@ def _make_gemini_llm(model: str) -> ChatGoogle:
     passar temperature= ao Agent é no-op — cai no **kwargs e é ignorado.)"""
     kwargs: dict = dict(
         model=model,
-        api_key=GEMINI_API_KEY,
+        api_key=api_key,
         temperature=0.1,
         max_output_tokens=16384,
+        # 429/quota deve trocar de chave imediatamente; erros 5xx continuam
+        # usando o retry/backoff interno do ChatGoogle.
+        max_retries=1,
+        retryable_status_codes=[500, 502, 503, 504],
     )
     if "gemini-3" in model and "flash" in model:
         kwargs["thinking_level"] = "low"      # Gemini 3 Flash: segura o thinking
     elif "gemini-2.5" in model:
         kwargs["thinking_budget"] = 2048      # Gemini 2.5: limita o thinking
     return ChatGoogle(**kwargs)
+
+
+class RotatingGemini:
+    """Gemini com troca permanente de chave durante o lote.
+
+    As quotas do Gemini são por projeto. A segunda chave deve estar associada
+    a outro projeto Google para funcionar como reserva real.
+    """
+
+    def __init__(self, primary: ChatGoogle, secondary: ChatGoogle | None = None):
+        self._clients = [primary] + ([secondary] if secondary is not None else [])
+        self._active = 0
+
+    @property
+    def provider(self) -> str:
+        return "google"
+
+    @property
+    def model(self) -> str:
+        return self._clients[self._active].model
+
+    @property
+    def name(self) -> str:
+        return self._clients[self._active].name
+
+    @property
+    def model_name(self) -> str:
+        return self.model
+
+    async def ainvoke(self, messages: list, output_format: type | None = None, **kwargs: Any):
+        try:
+            return await self._clients[self._active].ainvoke(messages, output_format, **kwargs)
+        except (ModelRateLimitError, ModelProviderError) as exc:
+            if self._active == 0 and len(self._clients) > 1 and _is_gemini_key_rotation_error(exc):
+                self._active = 1
+                print(
+                    f"[LLM] Gemini quota/limite atingido; alternando para a segunda chave "
+                    f"(modelo {self.model})."
+                )
+                return await self._clients[self._active].ainvoke(messages, output_format, **kwargs)
+            raise
+
+
+def _is_gemini_key_rotation_error(error: ModelProviderError) -> bool:
+    message = getattr(error, "message", str(error)).lower()
+    status_code = getattr(error, "status_code", 502)
+    markers = (
+        "resource exhausted",
+        "quota exceeded",
+        "quota_exceeded",
+        "rate limit",
+        "rate_limit_exceeded",
+        "too many requests",
+        "insufficient credits",
+        "billing",
+        "daily quota",
+    )
+    return status_code in {401, 402, 429} or any(marker in message for marker in markers)
 
 
 def _make_bedrock_llm(model: str) -> BaseChatModel:
@@ -166,7 +228,7 @@ def _make_bedrock_llm(model: str) -> BaseChatModel:
 
 def _make_llm(model: str) -> BaseChatModel:
     if LLM_PROVIDER == "gemini":
-        return _make_gemini_llm(model)
+        return _make_gemini_llm(model, GEMINI_API_KEY)
     if LLM_PROVIDER in {"bedrock", "aws_bedrock", "anthropic_bedrock", "claude_bedrock"}:
         return _make_bedrock_llm(model)
     raise RuntimeError(f"LLM_PROVIDER inválido: {LLM_PROVIDER!r}. Use 'gemini' ou 'bedrock'.")
@@ -176,14 +238,25 @@ def build_llm() -> BaseChatModel:
     if not GEMINI_API_KEY:
         if LLM_PROVIDER == "gemini":
             raise RuntimeError("GEMINI_API_KEY não configurada no .env")
-    model = BEDROCK_MODEL if LLM_PROVIDER != "gemini" else GEMINI_MODEL
-    return _make_llm(model)
+    if LLM_PROVIDER == "gemini":
+        primary = _make_gemini_llm(GEMINI_MODEL, GEMINI_API_KEY)
+        secondary = (
+            _make_gemini_llm(GEMINI_FALLBACK_MODEL, GEMINI_FALLBACK_API_KEY)
+            if GEMINI_FALLBACK_API_KEY else None
+        )
+        return RotatingGemini(primary, secondary)
+    return _make_llm(BEDROCK_MODEL)
 
 
-def build_fallback_llm() -> BaseChatModel:
-    """LLM de reserva para quando o principal retorna 503 (alta demanda)."""
-    model = BEDROCK_FALLBACK_MODEL if LLM_PROVIDER != "gemini" else GEMINI_FALLBACK_MODEL
-    return _make_llm(model)
+def build_fallback_llm() -> BaseChatModel | None:
+    """Fallback adicional do browser-use, usado apenas no modo Bedrock.
+
+    No Gemini, a rotação de chave fica dentro de RotatingGemini para continuar
+    ativa entre pacientes.
+    """
+    if LLM_PROVIDER == "gemini":
+        return None
+    return _make_llm(BEDROCK_FALLBACK_MODEL)
 
 
 def build_browser() -> Browser:

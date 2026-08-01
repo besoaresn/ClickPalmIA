@@ -24,8 +24,8 @@ RUN browser-use install
 COPY app ./app
 COPY calcular_metricas.py .
 
-# /data é o volume persistente (downloads/, reports/, metricas/, histórico) —
-# em Fargate, montar via EFS (ver docs/Deploy_AWS_Metricas_Custo_RPA_vs_APA.docx).
+# /data é o diretório de trabalho. Com STORAGE_BACKEND=s3, os artefatos são
+# persistidos no bucket e este diretório pode ser apenas o disco efêmero da task.
 RUN mkdir -p /data
 
 # Container "one-shot": processa o lote e encerra (sem restart automático —

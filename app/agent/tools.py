@@ -15,6 +15,7 @@ from browser_use.browser import BrowserSession
 
 from app.core.config import DOWNLOAD_DIR
 from app.core.runstate import RUN
+from app.integrations.storage import get_storage
 from app.domain.history import remove_accents, read_download_history, write_download_history
 from app.domain.filters import texto_indica_skip
 from app.agent.extraction import extract_report_pdf, read_report_text
@@ -181,6 +182,24 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
             f"relatório está aberto/focado e tente novamente, ou siga para o próximo."
         ))
 
+    storage = get_storage()
+    s3_uri = None
+    # Com RESULTS_S3_URI, o contrato de métricas envia somente telemetria e
+    # relatórios. PDFs com dados de paciente permanecem no EFS/disco local.
+    if storage.enabled and not storage.results_enabled:
+        try:
+            s3_uri = storage.upload_artifact(save_path, "downloads")
+        except Exception as exc:
+            _registrar(
+                "erro", nome_exame=params.nome_exame, data_exame=params.data_exame,
+                motivo=f"PDF salvo localmente, mas não foi enviado ao S3: {exc}",
+                etapa="s3_upload_failed",
+            )
+            return ActionResult(extracted_content=(
+                f"FALHA: o PDF de '{params.nome_exame}' foi extraído, mas o upload para "
+                "o armazenamento persistente falhou. Não marque como concluído."
+            ))
+
     write_download_history(hist_id)
     _registrar("baixado", download_method=metodo)
     _registrar(
@@ -190,6 +209,7 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
         decisao="baixado",
         download_method=metodo,
     )
+    destino = s3_uri or save_path
     return ActionResult(extracted_content=(
-        f"OK: '{params.nome_exame}' ({params.data_exame}) baixado [{metodo}] em {save_path}."
+        f"OK: '{params.nome_exame}' ({params.data_exame}) baixado [{metodo}] em {destino}."
     ))

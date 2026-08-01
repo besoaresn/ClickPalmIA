@@ -20,6 +20,17 @@ BASE_DIR = os.path.dirname(APP_DIR)
 PROJECT_DIR = os.path.dirname(BASE_DIR)
 DATA_DIR = os.path.abspath(os.getenv("DATA_DIR", os.path.join(BASE_DIR, "data")))
 
+# --- Armazenamento de artefatos ---
+# local = comportamento atual; s3 = disco efêmero local + bucket persistente.
+STORAGE_BACKEND = os.getenv("STORAGE_BACKEND", "local").strip().lower()
+S3_BUCKET = os.getenv("S3_BUCKET", "").strip()
+S3_PREFIX = os.getenv("S3_PREFIX", "clickpalmia").strip("/")
+S3_REGION = os.getenv("S3_REGION", os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", ""))).strip()
+S3_PRESIGNED_URL_EXPIRY = int(os.getenv("S3_PRESIGNED_URL_EXPIRY", "3600"))
+# Contrato específico das métricas: somente telemetria e relatórios sobem para
+# este prefixo. PDFs permanecem no EFS/disco local por conterem dados de paciente.
+RESULTS_S3_URI = os.getenv("RESULTS_S3_URI", "").strip().rstrip("/")
+
 # --- Execução ---
 IS_DOCKER = os.path.exists('/.dockerenv') or os.getenv('DOCKER_CONTAINER', 'false').lower() == 'true'
 HEADLESS_MODE = os.getenv('HEADLESS', str(IS_DOCKER)).lower() == 'true'
@@ -41,8 +52,11 @@ LLM_PROVIDER = os.getenv("LLM_PROVIDER", "gemini").strip().lower()
 # Gemini
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite")
-# Modelo de fallback usado quando o principal retorna 503/erro (alta demanda).
-GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.5-flash")
+# Segunda chave deve pertencer a outro projeto Google para ter quota independente.
+GEMINI_FALLBACK_API_KEY = os.getenv("GEMINI_FALLBACK_API_KEY", "")
+# Mantém o mesmo modelo por padrão para que a telemetria use o preço do
+# Gemini 3.1 Flash-Lite nas duas chaves.
+GEMINI_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.1-flash-lite")
 
 # AWS Bedrock / Claude
 BEDROCK_MODEL = os.getenv("BEDROCK_MODEL", "us.anthropic.claude-haiku-4-5-20251001-v1:0")
@@ -115,11 +129,9 @@ INFRA_MEMORIA_GB = float(os.getenv("INFRA_MEMORIA_GB", "2.0"))
 # Preços Fargate (US East, por hora). Ajustar se mudar de região.
 INFRA_CUSTO_VCPU_HORA = float(os.getenv("INFRA_CUSTO_VCPU_HORA", "0.04048"))
 INFRA_CUSTO_MEMORIA_GB_HORA = float(os.getenv("INFRA_CUSTO_MEMORIA_GB_HORA", "0.004445"))
-# Preço do LLM usado pelo agente (Gemini ou Bedrock/Claude), por milhão de tokens.
-# Default reflete Claude Haiku 4.5 via Bedrock (BEDROCK_MODEL acima), confirmado no
-# rate card real da conta (us-east-1); ajustar se trocar de modelo.
-LLM_PRECO_MILHAO_ENTRADA = float(os.getenv("LLM_PRECO_MILHAO_ENTRADA", "1.1"))
-LLM_PRECO_MILHAO_SAIDA = float(os.getenv("LLM_PRECO_MILHAO_SAIDA", "5.5"))
+# Preço padrão do Gemini 3.1 Flash-Lite, por milhão de tokens (USD).
+LLM_PRECO_MILHAO_ENTRADA = float(os.getenv("LLM_PRECO_MILHAO_ENTRADA", "0.25"))
+LLM_PRECO_MILHAO_SAIDA = float(os.getenv("LLM_PRECO_MILHAO_SAIDA", "1.50"))
 
 # --- Timeouts ---
 SEARCH_TIMEOUT = 10.0            # teto (s) para localizar o paciente na tabela

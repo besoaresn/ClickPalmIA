@@ -71,9 +71,33 @@ PORTAL_PASS=...
 LLM_PROVIDER=gemini        # gemini ou bedrock
 GEMINI_API_KEY=...
 GEMINI_MODEL=gemini-3.1-flash-lite
+GEMINI_FALLBACK_API_KEY=... # chave de outro projeto Google
+GEMINI_FALLBACK_MODEL=gemini-3.1-flash-lite
 SHEET_URL=https://docs.google.com/spreadsheets/d/SEU_ID/edit
 HEADLESS=false            # true = sem janela
 ```
+
+O fallback do Gemini troca para `GEMINI_FALLBACK_API_KEY` quando a primeira
+chave retornar quota/limite (`429`, `RESOURCE_EXHAUSTED` etc.) e mantém a
+segunda chave ativa para os próximos pacientes do mesmo lote. As duas chaves
+devem estar em projetos Google diferentes para que as quotas sejam independentes.
+O preço padrão registrado nas métricas é US$ 0,25 por milhão de tokens de
+entrada e US$ 1,50 por milhão de tokens de saída do Gemini 3.1 Flash-Lite.
+
+Para publicar os resultados das métricas sem expor PDFs de pacientes, configure
+na task definition:
+
+```env
+RESULTS_S3_URI=s3://clickpalmia-metricas-857145323577/apa
+```
+
+Ao final da execução, o aplicativo envia somente `telemetria/` e `reports/`
+para esse prefixo. PDFs permanecem no EFS/disco local. A Task Role precisa de
+`s3:PutObject`, `s3:GetObject` e `s3:ListBucket` no bucket privado.
+
+`STORAGE_BACKEND=s3`/`S3_BUCKET` continua disponível para o armazenamento legado
+de artefatos, mas não deve ser usado para o fluxo de métricas quando
+`RESULTS_S3_URI` estiver configurado.
 
 Para usar Claude via AWS Bedrock, troque o bloco de LLM:
 
