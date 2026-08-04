@@ -7,6 +7,7 @@ determinística, que reaproveita a lógica do RPA maduro via CDP.
 """
 import os
 import re
+import logging
 from datetime import datetime
 
 from pydantic import BaseModel, Field
@@ -16,11 +17,20 @@ from browser_use.browser import BrowserSession
 from app.core.config import DOWNLOAD_DIR
 from app.core.runstate import RUN
 from app.integrations.storage import get_storage
+from app.core.config import DEDUP_LOG_RATIO_MIN, DEDUP_SIMILARIDADE
 from app.domain.history import remove_accents, read_download_history, write_download_history
-from app.domain.filters import texto_indica_skip
+from app.domain.filters import (
+    check_exam_date,
+    is_relevant_exam,
+    laudo_tem_ressonancia,
+    laudo_tem_titulo_valido,
+    texto_indica_skip,
+    is_duplicate_report,
+)
 from app.agent.extraction import extract_report_pdf, read_report_text
 
 tools = Tools()
+logger = logging.getLogger(__name__)
 
 _INDISPONIVEL_MARKERS = (
     "nao esta disponivel para exibicao",
@@ -83,13 +93,47 @@ def _registrar(metodo: str, **kwargs) -> None:
     param_model=DownloadExameParams,
 )
 async def download_exam_report(params: DownloadExameParams, browser_session: BrowserSession) -> ActionResult:
-    cdp_session = await browser_session.get_or_create_cdp_session(focus=True)
+    # Barreira contra chamadas vazadas de outro run/paciente. O agente é
+    # recriado por paciente, mas a tool é global; nunca aceitar silenciosamente
+    # um nome vazio ou diferente do paciente atualmente vinculado.
+    expected_patient = remove_accents(RUN.paciente).strip().upper()
+    supplied_patient = remove_accents(params.nome_paciente).strip().upper()
+    if expected_patient and supplied_patient != expected_patient:
+        _registrar("erro", nome_exame=params.nome_exame, data_exame=params.data_exame,
+                   motivo=(f"Tool recebeu paciente diferente do contexto atual: "
+                           f"{params.nome_paciente!r}"), etapa="patient_context_mismatch")
+        return ActionResult(extracted_content=(
+            "FALHA DE CONTEXTO: o paciente informado não é o paciente atual. "
+            "Não baixe este laudo; confirme o registro atual e siga."
+        ))
+    if not re.fullmatch(r"\d+", params.id_paciente or ""):
+        _registrar("erro", nome_exame=params.nome_exame, data_exame=params.data_exame,
+                   motivo="ID numérico do paciente ausente ou inválido.", etapa="patient_id_invalid")
+        return ActionResult(extracted_content=(
+            "FALHA DE CONTEXTO: ID numérico do paciente ausente ou inválido. "
+            "Confirme o registro atual antes de continuar."
+        ))
 
     id_norm = (re.sub(r"\D", "", params.id_paciente) or "0").zfill(16)
     data_norm = remove_accents(params.data_exame).strip()
     # Chave estável (paciente-id-data-nome). Inclui a data: exames de mesmo nome
     # em datas diferentes são distintos (sem isto o 2º virava JA_BAIXADO).
     hist_id = f"{remove_accents(params.nome_paciente)}-{id_norm}-{data_norm}-{remove_accents(params.nome_exame)}".upper()
+
+    def ignore(decisao: str, texto: str) -> ActionResult:
+        RUN.marcar_processado(hist_id)
+        _registrar("ignorado")
+        _registrar("exame", nome_exame=params.nome_exame, data_exame=params.data_exame, decisao=decisao)
+        return ActionResult(extracted_content=texto)
+
+    # Etapa A: a tool também aplica os filtros do card como última barreira
+    # determinística caso o agente tenha selecionado um card indevido.
+    if "APENAS IMAGENS" in remove_accents(params.nome_exame).upper():
+        return ignore("ignorado_apenas_imagens", f"IGNORADO: '{params.nome_exame}' é apenas imagens.")
+    if not check_exam_date(params.data_exame):
+        return ignore("ignorado_data", f"IGNORADO: '{params.nome_exame}' está fora da janela de 2024-2025.")
+    if not is_relevant_exam(params.nome_exame):
+        return ignore("ignorado_irrelevante", f"IGNORADO: '{params.nome_exame}' não é um exame-alvo autorizado.")
 
     # Já TENTADO nesta execução? Não reprocessa. Sem isto, se algo falhar depois
     # de abrir o laudo, o agente pode reabrir o mesmo exame em loop e inflar as
@@ -115,6 +159,8 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
             f"Pule para o próximo exame."
         ))
 
+    cdp_session = await browser_session.get_or_create_cdp_session(focus=True)
+
     # Marca ANTES de processar: aconteça o que acontecer (sucesso, indisponível
     # ou falha), este exame não é tentado de novo nesta execução.
     RUN.marcar_processado(hist_id)
@@ -129,9 +175,9 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
     texto = await read_report_text(cdp_session)
     texto_norm = remove_accents(texto).lower()
 
-    # Carta de procedimento (localização pré-op, "PREZADO(A) COLEGA") -> não é
-    # exame diagnóstico, não conta como laudo baixado.
-    if texto and texto_indica_skip(texto):
+    # B5: marcador no corpo exige a segunda checagem pelo título. Isso preserva
+    # ecografias/mamografias válidas que também usam a saudação.
+    if texto and texto_indica_skip(texto) and not laudo_tem_titulo_valido(texto):
         write_download_history(hist_id)
         _registrar("ignorado")
         _registrar(
@@ -144,6 +190,31 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
             f"IGNORADO: '{params.nome_exame}' é carta de procedimento (não diagnóstico). "
             f"Não foi salvo como laudo. Siga para o próximo exame."
         ))
+
+    # B6: cards genéricos podem esconder a modalidade no cabeçalho do laudo.
+    if texto and laudo_tem_ressonancia(texto):
+        _registrar("ignorado")
+        _registrar("decisao_exame", nome_exame=params.nome_exame, data_exame=params.data_exame,
+                   decisao="ignorado_ressonancia")
+        return ActionResult(extracted_content=(
+            f"IGNORADO: o laudo de '{params.nome_exame}' é ressonância. Siga para o próximo."
+        ))
+
+    # B7: um laudo combinado pode aparecer em vários cards do mesmo paciente.
+    duplicado, ratio = is_duplicate_report(texto, params.data_exame, RUN.relatorios_salvos)
+    if duplicado:
+        _registrar("ignorado")
+        _registrar("decisao_exame", nome_exame=params.nome_exame, data_exame=params.data_exame,
+                   decisao="ignorado_duplicado")
+        return ActionResult(extracted_content=(
+            f"IGNORADO: laudo duplicado de '{params.nome_exame}' (similaridade {ratio:.3f})."
+        ))
+    if ratio >= DEDUP_LOG_RATIO_MIN:
+        logger.info(
+            "candidato_dedup paciente=%s exame=%s data=%s similaridade=%.3f limiar=%.2f",
+            params.nome_paciente, params.nome_exame, params.data_exame,
+            ratio, DEDUP_SIMILARIDADE,
+        )
 
     if texto and any(m in texto_norm for m in _INDISPONIVEL_MARKERS):
         _registrar("erro", nome_exame=params.nome_exame, data_exame=params.data_exame,
@@ -201,6 +272,7 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
             ))
 
     write_download_history(hist_id)
+    RUN.relatorios_salvos.append({"data_exame": params.data_exame, "texto": texto})
     _registrar("baixado", download_method=metodo)
     _registrar(
         "decisao_exame",

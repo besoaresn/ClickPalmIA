@@ -108,6 +108,16 @@ EXAM_EXCLUDE_KEYWORDS = [
     "PRE-OPERATORIA",
 ]
 
+# Denylist aplicada antes da lista de palavras-alvo. As fronteiras (\\b) em
+# modalidades curtas evitam casar RM dentro de palavras como TERMO.
+EXAM_MODALIDADES_PROIBIDAS = (
+    r"\bMR\b|\bRM\b|RESSONANCIA|\bTC\b|\bCT\b|TOMOGRAFIA|\bPET\b|"
+    r"CINTILOGRAFIA|CINTILO|DENSITOMETRIA"
+)
+EXAM_PROCEDIMENTOS_PROIBIDOS = (
+    r"BIOPSIA|BIOPSY|PUNCAO|DEMARCA|LOCALIZACAO|LOCALIZATION|NEEDLE|GUIAD[AO] POR"
+)
+
 # Marcadores no TEXTO DO LAUDO que indicam que NÃO é um exame diagnóstico e não
 # deve ser salvo como laudo baixado. O nome do card às vezes engana (diz "MAMO"
 # mas o conteúdo é uma carta de procedimento), então a checagem é feita no texto.
@@ -121,6 +131,14 @@ EXAM_REPORT_EXCLUDE_MARKERS = [
     "LOCALIZACAO PRE OPERATORIA",
     "PREZADO(A) COLEGA",
 ]
+EXAM_REPORT_RM_MARKERS = ["RESSONANCIA MAGNETICA", "RM DE MAMA"]
+EXAM_REPORT_HEADER_DELIM = "INFORMACAO CLINICA"
+EXAM_REPORT_HEADER_MAX = 400
+
+# Deduplicação de um mesmo laudo apresentado em vários cards.
+DEDUP_SIMILARIDADE = float(os.getenv("DEDUP_SIMILARIDADE", "0.90"))
+DEDUP_JANELA_DIAS = int(os.getenv("DEDUP_JANELA_DIAS", "7"))
+DEDUP_LOG_RATIO_MIN = float(os.getenv("DEDUP_LOG_RATIO_MIN", "0.85"))
 
 # --- Custo (infra Fargate + LLM), ver docs/Deploy_AWS_Metricas_Custo_RPA_vs_APA.docx ---
 # Tamanho da Task ECS Fargate desta execução (mesmo valor para RPA e APA na comparação).

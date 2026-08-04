@@ -15,7 +15,7 @@ from app.core.config import (
     BEDROCK_API_KEY, BEDROCK_AUTH_MODE, BEDROCK_FALLBACK_MODEL,
     BEDROCK_MAX_TOKENS, BEDROCK_MODEL, BEDROCK_RETRY_ATTEMPTS, GEMINI_API_KEY,
     GEMINI_FALLBACK_API_KEY, GEMINI_FALLBACK_MODEL, GEMINI_MODEL, HEADLESS_MODE,
-    DOWNLOAD_DIR, LLM_PROVIDER,
+    DOWNLOAD_DIR, LLM_PROVIDER, SITE_URL,
 )
 from app.domain.models import Paciente, SaidaAgente
 from app.agent.prompts import build_task
@@ -271,6 +271,17 @@ def build_browser() -> Browser:
 async def run_patient(browser: Browser, llm: BaseChatModel, paciente: Paciente,
                       fallback_llm: BaseChatModel | None = None,
                       report: ReportManager | None = None) -> SaidaAgente:
+    # O browser é compartilhado para preservar o login, mas o contexto de
+    # navegação NÃO pode ser compartilhado: ao terminar um laudo o agente pode
+    # deixar a aba do relatório focada. Nesse caso o próximo run pode continuar
+    # clicando nos exames do paciente anterior, sem perceber a troca de tarefa.
+    # Fechar todas as páginas e abrir a porta de entrada mantém cookies/sessão,
+    # porém elimina abas, laudos e seleções residuais.
+    pages = await browser.get_pages()
+    for page in pages:
+        await browser.close_page(page)
+    await browser.new_page(SITE_URL)
+
     task = build_task(paciente.nome, paciente.cpf)
     agent = Agent(
         task=task,

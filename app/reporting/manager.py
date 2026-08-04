@@ -204,7 +204,7 @@ class ReportManager:
         linhas.append(f"Pacientes não encontrados no portal: {self.pacientes_nao_encontrados}")
         linhas.append("")
         linhas.append(f"Total de exames baixados com sucesso: {total_baixados}")
-        linhas.append(f"Total de exames ignorados (localização pré-operatória): {total_ignorados}")
+        linhas.append(f"Total de exames ignorados por filtros: {total_ignorados}")
         linhas.append(f"Total de exames com falha: {total_falhas} (ver erros_*.json para detalhes)")
         if self.metodos_download:
             metodos = ", ".join(f"{m}: {q}" for m, q in sorted(self.metodos_download.items()))

@@ -22,17 +22,26 @@ ACCESS (only log in if you are not already logged in)
 
 STEPS
 1. LOGIN: if the login form is visible, log in with the credentials above. If you
-   are already inside the portal (search bar visible), skip login.
+   are already inside the portal (search bar visible), skip login. The browser
+   was reset to the portal entry point for this patient; do not trust any old
+   patient or report context.
 2. FIND PATIENT (max 3 tries): search "{nome_norm}" (full name); if nothing matches,
    try the FIRST NAME only. If still not found, finish with nao_encontrado=true.
+   Before opening any exam, confirm that the patient record heading matches
+   "{nome_norm}" (and CPF {cpf or "unknown"} when shown). Never process a
+   previous search result or a record with a different name.
 3. OPEN the patient record and READ the numeric patient ID (digits only). Keep it.
 4. LIST EXAMS and select the targets: exams from years {EXAM_YEAR_CUTOFF}-{EXAM_YEAR_MAX} whose
-   name matches breast keywords ({_KEYWORDS}). Only SKIP cards explicitly marked
+   name matches breast keywords ({_KEYWORDS}), and is NOT a prohibited modality
+   (MR/RM, CT/TC, tomography, PET, scintigraphy, densitometry) or procedure
+   (biopsy, puncture, demarcation, localization, needle, guided by). Apply the
+   denylist before the target keywords. Only SKIP cards explicitly marked
    "apenas imagens"; cards marked "somente registro"/"somente resultado" ARE targets.
    Make ONE list of the distinct target exams up front and process each exam ONCE.
 5. For EACH target exam:
    a) Open the exam, then click "Imprimir" to open the report (it opens in a new tab).
-   b) Call the tool `download_exam_report` with nome_paciente, the numeric id_paciente,
+   b) Call the tool `download_exam_report` with nome_paciente exactly equal to
+      "{nome_norm}", the numeric id_paciente,
       nome_exame AND data_exame (always include the date). The tool downloads the
       PDF locally and decides skip/unavailable on its own — just read its message.
    c) CLOSE the report tab. Do NOT call switch_tab — focus returns to the patient tab

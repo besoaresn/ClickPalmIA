@@ -12,12 +12,14 @@ class _RunState:
         self.paciente = ""      # nome do paciente atual
         self.cpf = ""
         self._processados: set[str] = set()  # hist_ids já tentados nesta execução do paciente
+        self.relatorios_salvos: list[dict] = []
 
     def bind(self, report, paciente: str, cpf: str = "") -> None:
         self.report = report
         self.paciente = paciente
         self.cpf = cpf
         self._processados = set()   # zera a memória de tentativas a cada paciente
+        self.relatorios_salvos = []
 
     def marcar_processado(self, hist_id: str) -> None:
         """Registra que um exame já foi tentado nesta execução (mesmo se falhou)."""
