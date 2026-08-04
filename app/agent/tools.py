@@ -30,6 +30,11 @@ from app.domain.filters import (
 from app.agent.extraction import extract_report_pdf, read_report_text
 
 tools = Tools()
+# O portal abre o laudo em uma nova aba e devolve o foco automaticamente ao
+# fechá-la. Trocar de aba manualmente deixa o DownloadsWatchdog do browser-use
+# sujeito a uma corrida com a aba que acabou de ser encerrada. Removemos a ação
+# do schema exposto ao LLM, em vez de depender apenas da instrução no prompt.
+tools.exclude_action("switch")
 logger = logging.getLogger(__name__)
 
 _INDISPONIVEL_MARKERS = (
@@ -45,6 +50,11 @@ class DownloadExameParams(BaseModel):
     nome_exame: str = Field(description="Nome/descrição do exame, ex.: 'MAMOGRAFIA BILATERAL'")
     data_exame: str = Field(default="", description="Data do exame (DD/MM/AAAA) — IMPORTANTE para diferenciar exames de mesmo nome")
     cpf: str = Field(default="", description="CPF do paciente, se conhecido")
+
+
+def _normalize_patient_name(nome: str) -> str:
+    """Normaliza diferenças de formatação entre planilha e resposta do agente."""
+    return " ".join(remove_accents(nome).split()).upper()
 
 
 def _registrar(metodo: str, **kwargs) -> None:
@@ -96,8 +106,8 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
     # Barreira contra chamadas vazadas de outro run/paciente. O agente é
     # recriado por paciente, mas a tool é global; nunca aceitar silenciosamente
     # um nome vazio ou diferente do paciente atualmente vinculado.
-    expected_patient = remove_accents(RUN.paciente).strip().upper()
-    supplied_patient = remove_accents(params.nome_paciente).strip().upper()
+    expected_patient = _normalize_patient_name(RUN.paciente)
+    supplied_patient = _normalize_patient_name(params.nome_paciente)
     if expected_patient and supplied_patient != expected_patient:
         _registrar("erro", nome_exame=params.nome_exame, data_exame=params.data_exame,
                    motivo=(f"Tool recebeu paciente diferente do contexto atual: "
@@ -159,7 +169,37 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
             f"Pule para o próximo exame."
         ))
 
-    cdp_session = await browser_session.get_or_create_cdp_session(focus=True)
+    # A aba do laudo pode ter acabado de ser criada/fechada quando o browser-use
+    # ainda atualiza o DownloadsWatchdog. Essa falha ocorre antes da extração e,
+    # sem este tratamento, desaparecia das métricas e do erros_*.json.
+    try:
+        cdp_session = await browser_session.get_or_create_cdp_session(focus=True)
+    except Exception as exc:
+        RUN.marcar_processado(hist_id)
+        logger.exception(
+            "cdp_session_unavailable paciente=%s exame=%s data=%s",
+            params.nome_paciente,
+            params.nome_exame,
+            params.data_exame,
+        )
+        _registrar(
+            "erro",
+            nome_exame=params.nome_exame,
+            data_exame=params.data_exame,
+            motivo=f"Não foi possível obter a sessão CDP da aba do laudo: {exc}",
+            etapa="cdp_session_unavailable",
+        )
+        _registrar(
+            "exame",
+            nome_exame=params.nome_exame,
+            data_exame=params.data_exame,
+            decisao="falha_sessao_cdp",
+        )
+        return ActionResult(extracted_content=(
+            f"FALHA DE INFRAESTRUTURA: não consegui acessar a aba do laudo de "
+            f"'{params.nome_exame}'. O erro foi registrado; não tente este exame novamente "
+            "nesta execução e siga para o próximo."
+        ))
 
     # Marca ANTES de processar: aconteça o que acontecer (sucesso, indisponível
     # ou falha), este exame não é tentado de novo nesta execução.

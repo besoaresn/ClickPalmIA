@@ -44,7 +44,7 @@ STEPS
       "{nome_norm}", the numeric id_paciente,
       nome_exame AND data_exame (always include the date). The tool downloads the
       PDF locally and decides skip/unavailable on its own — just read its message.
-   c) CLOSE the report tab. Do NOT call switch_tab — focus returns to the patient tab
+   c) CLOSE the report tab. Do NOT call `switch` — focus returns to the patient tab
       automatically. Then select the next target exam.
 6. FINISH with the structured output:
    - id_paciente: the numeric patient id (or empty if not found)

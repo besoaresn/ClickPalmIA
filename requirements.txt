@@ -1,5 +1,5 @@
 # Agente que dirige o browser (CDP) + LLMs, incluindo AWS Bedrock
-browser-use[aws]==0.12.9
+browser-use[aws]==0.13.7
 uv==0.11.23
 
 # Requerido pelo provider de credenciais "bearer token" do botocore quando
