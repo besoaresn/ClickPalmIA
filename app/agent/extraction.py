@@ -10,6 +10,8 @@ Cada função recebe o `cdp_session` obtido em uma action via
 """
 import base64
 
+from pypdf import PdfReader
+
 
 async def _evaluate(cdp_session, expression: str):
     """Runtime.evaluate de uma expressão JS (aceita IIFE async). Retorna o
@@ -100,3 +102,18 @@ async def extract_report_pdf(cdp_session, save_path: str) -> str | None:
     with open(save_path, 'wb') as f:
         f.write(data)
     return metodo
+
+
+def extract_pdf_text(pdf_path: str) -> str:
+    """Extrai texto do PDF salvo para deduplicação por conteúdo.
+
+    O texto da página do portal pode ficar vazio quando o laudo está em um
+    iframe de PDF. Neste caso, o PDF é a fonte confiável para comparar cards
+    que representam o mesmo laudo.
+    """
+    try:
+        with open(pdf_path, "rb") as pdf_file:
+            reader = PdfReader(pdf_file)
+            return "\n".join(page.extract_text() or "" for page in reader.pages)
+    except Exception:
+        return ""

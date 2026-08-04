@@ -27,7 +27,7 @@ from app.domain.filters import (
     texto_indica_skip,
     is_duplicate_report,
 )
-from app.agent.extraction import extract_report_pdf, read_report_text
+from app.agent.extraction import extract_pdf_text, extract_report_pdf, read_report_text
 
 tools = Tools()
 # O portal abre o laudo em uma nova aba e devolve o foco automaticamente ao
@@ -293,6 +293,27 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
             f"relatório está aberto/focado e tente novamente, ou siga para o próximo."
         ))
 
+    # O relatório pode estar em um iframe de PDF cujo texto não é acessível ao
+    # DOM. Revalida o dedup com a fonte definitiva antes de manter o arquivo.
+    texto_pdf = extract_pdf_text(save_path)
+    if texto_pdf:
+        duplicado, ratio = is_duplicate_report(
+            texto_pdf, params.data_exame, RUN.relatorios_salvos
+        )
+        if duplicado:
+            os.remove(save_path)
+            _registrar("ignorado")
+            _registrar(
+                "decisao_exame",
+                nome_exame=params.nome_exame,
+                data_exame=params.data_exame,
+                decisao="ignorado_duplicado_pdf",
+            )
+            return ActionResult(extracted_content=(
+                f"IGNORADO: PDF duplicado de '{params.nome_exame}' "
+                f"(similaridade {ratio:.3f}); o arquivo temporário foi removido."
+            ))
+
     storage = get_storage()
     s3_uri = None
     # Com RESULTS_S3_URI, o contrato de métricas envia somente telemetria e
@@ -312,7 +333,10 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
             ))
 
     write_download_history(hist_id)
-    RUN.relatorios_salvos.append({"data_exame": params.data_exame, "texto": texto})
+    RUN.relatorios_salvos.append({
+        "data_exame": params.data_exame,
+        "texto": texto_pdf or texto,
+    })
     _registrar("baixado", download_method=metodo)
     _registrar(
         "decisao_exame",

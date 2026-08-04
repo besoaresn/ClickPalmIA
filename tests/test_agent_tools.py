@@ -2,10 +2,12 @@
 import asyncio
 import os
 import sys
+from unittest.mock import mock_open, patch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.agent.tools import DownloadExameParams, download_exam_report, tools
+from app.agent.extraction import extract_pdf_text
 from app.core.runstate import RUN
 from app.reporting.manager import ReportManager
 
@@ -38,3 +40,21 @@ def test_falha_ao_obter_sessao_cdp_e_registrada():
     assert report.por_paciente["Paciente  de Teste"]["alvos"] == 0
     assert report.por_paciente["Paciente  de Teste"]["falhas"] == 1
     assert report.erros[0]["etapa"] == "cdp_session_unavailable"
+
+
+def test_extract_pdf_text_usa_texto_de_todas_as_paginas():
+    class Pagina:
+        def __init__(self, texto):
+            self.texto = texto
+
+        def extract_text(self):
+            return self.texto
+
+    class Reader:
+        pages = [Pagina("primeira"), Pagina("segunda")]
+
+    with (
+        patch("builtins.open", mock_open(read_data=b"pdf simulado")),
+        patch("app.agent.extraction.PdfReader", return_value=Reader()),
+    ):
+        assert extract_pdf_text("laudo.pdf") == "primeira\nsegunda"
