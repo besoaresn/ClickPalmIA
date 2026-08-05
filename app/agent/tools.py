@@ -294,9 +294,39 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
         ))
 
     # O relatório pode estar em um iframe de PDF cujo texto não é acessível ao
-    # DOM. Revalida o dedup com a fonte definitiva antes de manter o arquivo.
+    # DOM. Reaplica os filtros de conteúdo e o dedup com a fonte definitiva
+    # antes de manter o arquivo.
     texto_pdf = extract_pdf_text(save_path)
     if texto_pdf:
+        if texto_indica_skip(texto_pdf) and not laudo_tem_titulo_valido(texto_pdf):
+            os.remove(save_path)
+            write_download_history(hist_id)
+            _registrar("ignorado")
+            _registrar(
+                "decisao_exame",
+                nome_exame=params.nome_exame,
+                data_exame=params.data_exame,
+                decisao="ignorado_marcador_pdf",
+            )
+            return ActionResult(extracted_content=(
+                f"IGNORADO: o PDF de '{params.nome_exame}' é carta ou procedimento "
+                "(não diagnóstico); o arquivo temporário foi removido."
+            ))
+
+        if laudo_tem_ressonancia(texto_pdf):
+            os.remove(save_path)
+            _registrar("ignorado")
+            _registrar(
+                "decisao_exame",
+                nome_exame=params.nome_exame,
+                data_exame=params.data_exame,
+                decisao="ignorado_ressonancia_pdf",
+            )
+            return ActionResult(extracted_content=(
+                f"IGNORADO: o PDF de '{params.nome_exame}' é ressonância; "
+                "o arquivo temporário foi removido."
+            ))
+
         duplicado, ratio = is_duplicate_report(
             texto_pdf, params.data_exame, RUN.relatorios_salvos
         )

@@ -68,3 +68,14 @@ def test_texto_indica_skip_carta_procedimento():
     assert texto_indica_skip("Prezado(a) Colega, encaminho a paciente...") is True
     assert texto_indica_skip("LOCALIZACAO PRE-OPERATORIA da lesao") is True
     assert texto_indica_skip("Mamografia: BI-RADS 2. Achados benignos.") is False
+
+
+def test_procedimentos_detectados_no_texto_do_pdf_nao_tem_titulo_valido():
+    localizacao = """LOCALIZAÇÃO PRÉ-OPERATÓRIA GUIADA POR MAMOGRAFIA
+    Prezado(a) Colega, localização pré-operatória de lesão não palpável."""
+    biopsia = """BIÓPSIA MAMÁRIA GUIADA POR ECOGRAFIA
+    Prezado(a) colega, resultado de exame anatomopatológico."""
+
+    for texto in (localizacao, biopsia):
+        assert texto_indica_skip(texto) is True
+        assert laudo_tem_titulo_valido(texto) is False
