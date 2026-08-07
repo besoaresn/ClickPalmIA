@@ -91,8 +91,10 @@ na task definition:
 RESULTS_S3_URI=s3://clickpalmia-metricas-857145323577/apa
 ```
 
-Ao final da execução, o aplicativo envia somente `telemetria/` e `reports/`
-para esse prefixo. PDFs permanecem no EFS/disco local. A Task Role precisa de
+Ao final da execução, o aplicativo envia `telemetria/` e `reports/` para esse
+prefixo. PDFs permanecem no EFS/disco local por padrão. Para um batch de teste,
+é possível habilitar explicitamente `RESULTS_S3_UPLOAD_PDFS=true`; nesse caso,
+cada PDF validado é enviado para `exames/`. A Task Role precisa de
 `s3:PutObject`, `s3:GetObject` e `s3:ListBucket` no bucket privado.
 
 `STORAGE_BACKEND=s3`/`S3_BUCKET` continua disponível para o armazenamento legado

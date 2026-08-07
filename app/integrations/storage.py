@@ -115,10 +115,10 @@ class ArtifactStorage:
         return self.upload_file(local_path, f"{category}/{Path(local_path).name}")
 
     def upload_result_artifact(self, local_path: str, category: str) -> str | None:
-        """Envia telemetria/relatórios para RESULTS_S3_URI.
+        """Envia artefatos para RESULTS_S3_URI.
 
-        O nome externo segue o contrato do guia (``telemetria`` e ``reports``),
-        independentemente do nome interno usado pelo aplicativo.
+        O nome externo segue o contrato do guia (``telemetria``, ``reports`` e
+        ``exames``), independentemente do nome interno usado pelo aplicativo.
         Sem RESULTS_S3_URI, mantém o comportamento legado de STORAGE_BACKEND.
         """
         if not self.results_enabled:

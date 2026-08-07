@@ -27,9 +27,12 @@ S3_BUCKET = os.getenv("S3_BUCKET", "").strip()
 S3_PREFIX = os.getenv("S3_PREFIX", "clickpalmia").strip("/")
 S3_REGION = os.getenv("S3_REGION", os.getenv("AWS_REGION", os.getenv("AWS_DEFAULT_REGION", ""))).strip()
 S3_PRESIGNED_URL_EXPIRY = int(os.getenv("S3_PRESIGNED_URL_EXPIRY", "3600"))
-# Contrato específico das métricas: somente telemetria e relatórios sobem para
-# este prefixo. PDFs permanecem no EFS/disco local por conterem dados de paciente.
+# Contrato específico das métricas. PDFs continuam fora do S3 por padrão, mas
+# podem ser enviados explicitamente em batches de teste.
 RESULTS_S3_URI = os.getenv("RESULTS_S3_URI", "").strip().rstrip("/")
+RESULTS_S3_UPLOAD_PDFS = os.getenv("RESULTS_S3_UPLOAD_PDFS", "false").strip().lower() in {
+    "1", "true", "yes", "sim"
+}
 
 # --- Execução ---
 IS_DOCKER = os.path.exists('/.dockerenv') or os.getenv('DOCKER_CONTAINER', 'false').lower() == 'true'

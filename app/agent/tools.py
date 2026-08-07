@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from browser_use import Tools, ActionResult
 from browser_use.browser import BrowserSession
 
-from app.core.config import DOWNLOAD_DIR
+from app.core.config import DOWNLOAD_DIR, RESULTS_S3_UPLOAD_PDFS
 from app.core.runstate import RUN
 from app.integrations.storage import get_storage
 from app.core.config import DEDUP_LOG_RATIO_MIN, DEDUP_SIMILARIDADE
@@ -346,11 +346,24 @@ async def download_exam_report(params: DownloadExameParams, browser_session: Bro
 
     storage = get_storage()
     s3_uri = None
-    # Com RESULTS_S3_URI, o contrato de métricas envia somente telemetria e
-    # relatórios. PDFs com dados de paciente permanecem no EFS/disco local.
+    # PDFs permanecem locais por padrão. Em batches de teste, podem ser enviados
+    # explicitamente para o prefixo exames/ do RESULTS_S3_URI.
     if storage.enabled and not storage.results_enabled:
         try:
             s3_uri = storage.upload_artifact(save_path, "downloads")
+        except Exception as exc:
+            _registrar(
+                "erro", nome_exame=params.nome_exame, data_exame=params.data_exame,
+                motivo=f"PDF salvo localmente, mas não foi enviado ao S3: {exc}",
+                etapa="s3_upload_failed",
+            )
+            return ActionResult(extracted_content=(
+                f"FALHA: o PDF de '{params.nome_exame}' foi extraído, mas o upload para "
+                "o armazenamento persistente falhou. Não marque como concluído."
+            ))
+    elif storage.results_enabled and RESULTS_S3_UPLOAD_PDFS:
+        try:
+            s3_uri = storage.upload_result_artifact(save_path, "exames")
         except Exception as exc:
             _registrar(
                 "erro", nome_exame=params.nome_exame, data_exame=params.data_exame,

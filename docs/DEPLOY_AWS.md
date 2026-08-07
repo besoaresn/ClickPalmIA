@@ -26,14 +26,17 @@ etc. — carregue com `source docs/bedrock-deploy/deploy.env`).
 | Log group | `$LOG_GROUP` |
 | VPC / Subnets / SG | `$VPC_ID` / `$SUBNET_ID_A` (us-east-1a), `$SUBNET_ID_B` (us-east-1b) / `$SECURITY_GROUP_ID` |
 
-Com `RESULTS_S3_URI`, a task publica somente telemetria e relatórios no bucket
-privado. PDFs de laudo permanecem no EFS, pois contêm dados de paciente. O
+Com `RESULTS_S3_URI`, a task publica telemetria e relatórios no bucket privado.
+PDFs de laudo permanecem no EFS por padrão, pois contêm dados de paciente. Para
+batches de teste, `RESULTS_S3_UPLOAD_PDFS=true` publica os PDFs em `exames/`. O
 `credenciais.json` continua fora do S3, montado como arquivo somente leitura.
 
 Exemplo de variáveis na task definition:
 
 ```text
 RESULTS_S3_URI=s3://clickpalmia-metricas-857145323577/apa
+# Somente em batch de teste, se for necessário armazenar os PDFs.
+RESULTS_S3_UPLOAD_PDFS=false
 DATA_DIR=/tmp/clickpalmia
 ```
 
